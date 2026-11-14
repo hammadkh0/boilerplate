@@ -72,6 +72,38 @@ export class AppConfigService {
     return this.config.get('TRUST_PROXY', { infer: true }) === 'true';
   }
 
+  get appName(): string {
+    return this.config.get('APP_NAME', { infer: true });
+  }
+
+  get emailFrom(): string {
+    const value = this.config.get('EMAIL_FROM', { infer: true });
+    if (!value) {
+      throw new Error('EMAIL_FROM is required');
+    }
+    return value;
+  }
+
+  get resendApiKey(): string {
+    const value = this.config.get('RESEND_API_KEY', { infer: true });
+    if (!value) {
+      throw new Error('RESEND_API_KEY is required');
+    }
+    return value;
+  }
+
+  get seedAdminEmail(): string | undefined {
+    return this.readBlankable('SEED_ADMIN_EMAIL');
+  }
+
+  get seedAdminPassword(): string | undefined {
+    return this.readBlankable('SEED_ADMIN_PASSWORD');
+  }
+
+  get seedAdminName(): string | undefined {
+    return this.readBlankable('SEED_ADMIN_NAME');
+  }
+
   get phoneDefaultRegion(): CountryCode {
     return this.config.get('PHONE_DEFAULT_REGION', { infer: true }).toUpperCase() as CountryCode;
   }
@@ -90,6 +122,13 @@ export class AppConfigService {
 
   get s3SecretAccessKey(): string | undefined {
     return this.readOptional('S3_SECRET_ACCESS_KEY');
+  }
+
+  private readBlankable(
+    key: 'SEED_ADMIN_EMAIL' | 'SEED_ADMIN_PASSWORD' | 'SEED_ADMIN_NAME',
+  ): string | undefined {
+    const value = this.config.get(key, { infer: true });
+    return value && value.length > 0 ? value : undefined;
   }
 
   private readOptional(

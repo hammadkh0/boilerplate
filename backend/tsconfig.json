@@ -19,5 +19,5 @@
     "esModuleInterop": true,
     "types": ["node", "jest"]
   },
-  "include": ["src", "test", "prisma.config.ts"]
+  "include": ["src", "test", "scripts", "prisma.config.ts"]
 }

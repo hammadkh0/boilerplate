@@ -6,7 +6,7 @@ import ejs from 'ejs';
 export const EMAIL_LOGO_CONTENT_ID = 'app-logo';
 export const EMAIL_LOGO_SRC = `cid:${EMAIL_LOGO_CONTENT_ID}`;
 
-const TEMPLATE_ROOT = path.resolve(process.cwd(), 'src', 'modules', 'emails', 'templates');
+const TEMPLATE_ROOT = path.resolve(__dirname, '..', 'templates');
 
 /** Brand fields passed into every transactional template. */
 export function buildEmailBranding(

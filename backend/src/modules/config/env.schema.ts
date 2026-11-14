@@ -27,12 +27,35 @@ export const envSchema = z
     HTTP_REQUEST_LOG_ENABLED: z.enum(['true', 'false']),
     TRUST_PROXY: z.enum(['true', 'false']),
     PHONE_DEFAULT_REGION: z.string().length(2),
+    APP_NAME: z.string().min(1).default('Acme'),
+    EMAIL_FROM: z.string().min(1).optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    SEED_ADMIN_EMAIL: z.string().optional(),
+    SEED_ADMIN_PASSWORD: z.string().optional(),
+    SEED_ADMIN_NAME: z.string().max(120).optional(),
     S3_REGION: z.string().optional(),
     S3_BUCKET: z.string().optional(),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
   })
   .superRefine((value, ctx) => {
+    if (value.NODE_ENV !== 'test') {
+      if (!value.RESEND_API_KEY) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['RESEND_API_KEY'],
+          message: 'RESEND_API_KEY is required',
+        });
+      }
+      if (!value.EMAIL_FROM) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['EMAIL_FROM'],
+          message: 'EMAIL_FROM is required',
+        });
+      }
+    }
+
     if (value.S3_ENABLED !== 'true') {
       return;
     }

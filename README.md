@@ -39,7 +39,10 @@ Copy-Item .env.example .env
 npm install
 npx prisma migrate dev
 npm run dev
+npm run seed
 ```
+
+`npm run seed` creates the super admin from `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, and `SEED_ADMIN_NAME`. Change those values before anyone else can reach the database.
 
 Replace the two JWT secrets in `.env` before the API is used anywhere except your machine. The health check is `http://localhost:3001/health`. Swagger is `http://localhost:3001/api/docs` when `SWAGGER_ENABLED=true`. Postgres is on port 5432 and Adminer is on port 8080.
 
