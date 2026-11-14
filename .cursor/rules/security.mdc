@@ -1,0 +1,207 @@
+---
+description: Security rules for backend and frontend. Secrets, auth, authorization, validation, injection, XSS, CSRF, uploads, redirects, data exposure, logging and dependencies.
+alwaysApply: true
+---
+
+# Security
+
+Every rule here maps to a common class of vulnerability. Each section starts with one line on the attack it prevents. When a rule and a deadline conflict, keep the rule and raise the conflict with the user.
+
+## 1. Secrets and configuration
+
+Attack prevented: leaked credentials, and apps that silently run with weak defaults.
+
+Must:
+- Read config only through `AppConfigService` on the backend and `src/config/env.ts` on the frontend. Both validate env with Zod at startup.
+- Add every new variable to the Zod schema and to `.env.example` with a placeholder value.
+- Make secrets required in the schema. The app must refuse to start without them.
+- Prefix a frontend variable with `NEXT_PUBLIC_` only when the browser needs it. Anything with that prefix is public.
+
+Never:
+- Give a secret a default value (`JWT_SECRET ?? 'dev-secret'`).
+- Read `process.env` outside the config files.
+- Commit `.env` files, keys, tokens or real credentials, including in tests and seed scripts.
+- Put a secret in a `NEXT_PUBLIC_` variable.
+
+## 2. Authentication
+
+Attack prevented: stolen sessions, password cracking and account enumeration.
+
+Must:
+- Keep both tokens in httpOnly cookies, following `docs/PLAN.md` section 3.4. JavaScript never reads or stores a token.
+- Hash passwords with bcrypt at cost 12, through `hashData` and `compareData`.
+- Hash refresh, verification and reset tokens with SHA-256 through `hashToken` before storing them. bcrypt reads only the first 72 bytes, so it can't tell two JWTs apart.
+- Check `tokenVersion`, `status` and `deletedAt` on every token validation.
+- Bump `tokenVersion` on password change, password reset, suspension, soft delete and "log out everywhere".
+- Return the same message for "wrong email" and "wrong password". Forgot-password returns the same response whether or not the email exists.
+- Make verification and reset tokens single-use with an expiry. Clear the hash once used.
+
+Never:
+- Put a token in `localStorage`, `sessionStorage`, a non-httpOnly cookie, a URL (except one-time email links) or a log.
+- Return `passwordHash`, `refreshTokenHash`, token hashes or `tokenVersion` in any response.
+- Write your own JWT parsing. Use `@nestjs/jwt` and the Passport strategy.
+
+## 3. Authorization
+
+Attack prevented: users reading or changing data that isn't theirs (IDOR), and privilege escalation.
+
+Must:
+- Treat every route as private. The global `JwtAuthGuard` enforces that, and `@Public()` is the only opt-out.
+- Put `@Roles(...)` with `Role` enum values on every admin route handler. Admin and user routes share one controller per module, so the check belongs on each method. A handler without it is open to every signed-in user.
+- Take the user ID for `/me` routes from `@CurrentUser()`, never from the body, query or URL.
+- Scope every query on user-owned data by owner, and pass the owner ID through `requireDefined`.
+- Return 404, not 403, when a user asks for a record they don't own, so the response doesn't confirm the record exists.
+- Stop admins from changing their own role or status, and stop anyone below `SUPER_ADMIN` from granting `SUPER_ADMIN`.
+
+Never:
+- Add `@Public()` to a route that reads or writes user data.
+- Trust a `role`, `userId`, `status` or `ownerId` field sent by the client.
+- Rely on the frontend hiding a button as the only access check.
+
+## 4. Input validation
+
+Attack prevented: malformed or oversized input, and mass assignment.
+
+Must:
+- Validate every body, query and param with a DTO. The global `ValidationPipe` runs with `whitelist`, `forbidNonWhitelisted` and `transform`.
+- Give every string field a `@MaxLength`, every number `@Min` and `@Max`, and every array `@ArrayMaxSize`.
+- Validate IDs with `@IsUUID('7')` and enums with `@IsEnum`.
+- Check `sortBy` against a whitelist constant.
+- Normalize emails to lowercase and trim them before lookup or storage.
+- Validate on the frontend with Zod as well, for UX only. The backend is the authority.
+
+Never:
+- Pass a DTO straight into Prisma `data` without picking fields. Build `data` explicitly or with `buildPatchData`.
+- Accept a JSON body larger than 1 MB, except on upload routes with their own limit.
+
+## 5. Injection
+
+Attack prevented: SQL injection and template injection.
+
+Must:
+- Query through the Prisma client.
+- Use `$queryRaw` only as a tagged template (`` prisma.$queryRaw`... ${value}` ``), which parameterizes values.
+- Render emails through EJS with `<%= %>`, which escapes HTML.
+
+Never:
+- Call `$queryRawUnsafe` or `$executeRawUnsafe` with any value that came from a request.
+- Build a Prisma field name or `orderBy` key from raw user input without a whitelist.
+- Use EJS `<%- %>` (unescaped) with user data.
+- Pass user input to `eval`, `new Function`, `child_process` or a file path.
+
+## 6. XSS and output
+
+Attack prevented: script injection into pages.
+
+Must:
+- Let React escape output. Render user content as text.
+- Keep the Content-Security-Policy and security headers in `next.config.ts` when editing that file.
+- Use `next/link` or validated URLs for `href` values built from data. Allow only `http:`, `https:` and `mailto:` schemes.
+
+Never:
+- Use `dangerouslySetInnerHTML` with user content. If HTML rendering is unavoidable, sanitize with DOMPurify first and say why in a comment.
+- Put user content into `<script>` tags. JSON-LD uses `JSON.stringify` output from trusted constants only.
+
+## 7. CSRF and CORS
+
+Attack prevented: another site making requests with the user's cookies.
+
+Must:
+- Keep auth cookies `SameSite=Lax`, `Secure` in production and `HttpOnly`.
+- Keep `OriginGuard` on state-changing methods (`POST`, `PUT`, `PATCH`, `DELETE`).
+- Read allowed origins from `CORS_ORIGINS` in env, with `credentials: true`.
+
+Never:
+- Change state on a `GET` request.
+- Set CORS `origin` to `*` or reflect the request origin.
+- Hardcode production origins in `main.ts`.
+
+## 8. File uploads
+
+Attack prevented: malware uploads, storage abuse and path traversal.
+
+Must:
+- Enforce a size limit and an allowed-type list on every upload route.
+- Check the real file type from its magic bytes with `file-type`. Don't trust the `mimetype` or the extension.
+- Build S3 keys on the server as `<folder>/<uuidv7>.<ext>`.
+- Keep the bucket private. Serve files through presigned GET URLs that expire within 1 hour.
+- Re-encode images with `sharp` where the plan says so. That also strips metadata such as GPS location.
+
+Never:
+- Use the client's filename in a storage key or a file path.
+- Make the bucket or objects public.
+
+## 9. Redirects and URLs
+
+Attack prevented: open redirects used for phishing, and server-side request forgery.
+
+Must:
+- Pass every `?next=` or `?redirect=` value through `sanitizeRedirectPath`, which allows only same-site relative paths.
+- Build email links from `FRONTEND_URL` in config.
+
+Never:
+- Redirect to a full URL taken from a request.
+- Fetch a URL supplied by a user from the server.
+
+## 10. Errors and data exposure
+
+Attack prevented: leaking internals that help an attacker.
+
+Must:
+- Use explicit `select` so responses contain only the fields the client needs.
+- Throw Nest `HttpException` subclasses with plain messages. `HttpExceptionFilter` maps Prisma errors to safe messages.
+- Return stack traces only when `NODE_ENV` is not `production`.
+- Keep Swagger off in production unless `SWAGGER_ENABLED=true`.
+
+Never:
+- Send Prisma error messages, SQL, stack traces or file paths to the client in production.
+- Return a full Prisma model to the client.
+
+## 11. Logging
+
+Attack prevented: secrets and personal data ending up in log storage.
+
+Must:
+- Log through the Nest `Logger`, which goes to pino with redaction.
+- Add any new sensitive field name to the redaction list in the logger config.
+
+Never:
+- Log passwords, tokens, cookies, `Authorization` headers, reset links or full request bodies on auth routes.
+- Log full user records. Log the user ID.
+
+## 12. Rate limiting and abuse
+
+Attack prevented: brute force, credential stuffing and email bombing.
+
+Must:
+- Keep the global `ThrottlerGuard`.
+- Put a stricter `@Throttle` on login, register, refresh, forgot-password, reset-password and resend-verification.
+- Enforce a cooldown on any endpoint that sends an email to an address.
+
+## 13. Dependencies
+
+Attack prevented: known vulnerabilities in packages.
+
+Must:
+- Commit lockfiles.
+- Keep `npm audit --audit-level=high` passing. The pre-push hook runs it.
+- Pick maintained packages with recent releases. Tell the user before adding a dependency.
+
+Never:
+- Install a package to replace a few lines of code.
+- Use `--force` or `--legacy-peer-deps` without telling the user why.
+
+## Review checklist
+
+- [ ] No secret has a default, no `process.env` outside config, and no credentials in the diff.
+- [ ] New routes are private unless marked `@Public()` for a clear reason. Every admin handler has `@Roles(...)`.
+- [ ] Queries on user-owned data filter by owner through `requireDefined`.
+- [ ] Every new DTO field has type, length or range limits. Sort fields are whitelisted.
+- [ ] No raw SQL with request values, and no unescaped template output.
+- [ ] No `dangerouslySetInnerHTML` with user content.
+- [ ] Responses use `select` and contain no hashes, `tokenVersion` or internals.
+- [ ] Uploads check size and magic bytes and use server-built keys.
+- [ ] Redirect targets pass through `sanitizeRedirectPath`.
+- [ ] Logs contain no tokens, passwords or full records.
+- [ ] Sensitive endpoints have `@Throttle`.
+- [ ] New dependencies were agreed with the user and `npm audit` passes.

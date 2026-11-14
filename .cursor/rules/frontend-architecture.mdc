@@ -1,0 +1,235 @@
+---
+description: Next.js frontend architecture. Folder layout, server vs client components, services layer, React Query, React 19 and the React Compiler, effects and set-state-in-effect, URL state, copy constants, auth and Core Web Vitals.
+globs: frontend/**
+alwaysApply: false
+---
+
+# Frontend architecture
+
+The frontend is Next.js 16 with the App Router, React 19 and the React Compiler. `docs/PLAN.md` section 4 has the full tree. UI rules live in `frontend-ui.mdc`, and page metadata rules live in `frontend-seo-marketing.mdc`.
+
+## 1. Folder layout and naming
+
+| Folder | Holds |
+|---|---|
+| `src/app/` | Routes, layouts, `loading.tsx`, `error.tsx`, metadata files. Pages compose components and fetch data. They hold no business logic. |
+| `src/components/ui/` | shadcn components only |
+| `src/components/<feature>/` | Feature components, such as `users/`, `auth/` or `marketing/` |
+| `src/services/` | API calls. `<feature>.service.ts` for the browser, `<feature>.server.ts` for server reads |
+| `src/queries/` | React Query `queryOptions` factories and query keys |
+| `src/hooks/` | Shared hooks |
+| `src/lib/` | Pure helpers |
+| `src/constants/` | Domain constants, routes, page sizes, and `copy/` for user-facing text |
+| `src/types/` | API and domain types |
+| `src/schemas/` | Zod schemas |
+| `src/config/` | `site.config.ts` and `env.ts` |
+
+Must:
+- Name files in kebab-case (`users-table.tsx`) and export components in PascalCase (`UsersTable`).
+- Name hooks `use-<name>.ts`, exporting `use<Name>`.
+- Import with the `@/` alias.
+
+## 2. Server and client components
+
+Server components are the default. Each `"use client"` file ships its code and everything it imports to the browser.
+
+Must:
+- Keep `page.tsx` and `layout.tsx` as server components. `error.tsx` and `global-error.tsx` are client components because Next requires it.
+- Put `"use client"` on the smallest component that needs state, effects, event handlers, browser APIs or a client-only library.
+- Fetch initial data in the server page through a `*.server.ts` service, and pass it to client components as props.
+- Pass server-rendered content into client wrappers as `children` instead of moving it into the client file.
+- Pass only serializable props from server to client: plain objects, arrays, strings, numbers, booleans and `null`. Convert dates to ISO strings.
+
+Never:
+- Add `"use client"` to a page, a layout or a whole section just to make one button interactive.
+- Import a `*.server.ts` file or `services/http/server.ts` into a client component. ESLint blocks it, and `server-only` fails the build.
+- Fetch data in `useEffect`. Use a server component or React Query.
+
+```tsx
+// Good: server page, small client island
+export default async function UsersPage({ searchParams }: PageProps<'/admin/users'>) {
+  const query = parseUsersSearchParams(await searchParams);
+  const initialData = await listUsersServer(query);
+  return (
+    <>
+      <PageHeader title={USERS_COPY.TITLE} description={USERS_COPY.DESCRIPTION} />
+      <UsersKpiCards />
+      <UsersTable initialData={initialData} />
+    </>
+  );
+}
+```
+
+## 3. Services layer
+
+Components never call axios or `fetch` directly. Every API call goes through a service function.
+
+| Where the code runs | Client | File |
+|---|---|---|
+| Client components, React Query, form submits | Axios instance from `services/http/client.ts` | `<feature>.service.ts` |
+| Server components, `generateMetadata`, `sitemap.ts` | `serverFetch` from `services/http/server.ts` | `<feature>.server.ts`, starting with `import 'server-only'` |
+| Streaming responses | `fetch` | The feature's service file, with a comment explaining why |
+
+Must:
+- Type every service function's arguments and return value with types from `src/types/`.
+- Unwrap the `{ success, data }` envelope inside the service and return `data`.
+- Give read functions a last parameter `options?: ServiceRequestOptions` and pass `options.signal` to the request.
+- Let errors surface as `ApiError`, which the axios interceptor creates. Call `rethrowIfAbort(error)` before mapping an error, so cancelled requests never show a toast.
+- Pick `revalidate` or `cache: 'no-store'` deliberately in server reads. Admin and account data is `no-store`.
+
+Never:
+- Use axios or `fetch` inside a component or hook.
+- Hardcode the API base URL. The browser uses relative `/api/v1` paths, which the Next rewrite forwards. The server uses `BACKEND_URL` from config.
+- Add token handling to services. Cookies carry auth, and the interceptor handles 401 refresh.
+
+## 4. React Query
+
+Must:
+- Define queries as `queryOptions` factories in `src/queries/<feature>.ts`, with keys built from a `<FEATURE>_QUERY_KEYS` constant.
+- Shape keys as `[feature, scope, params]`, for example `['users', 'admin-list', query]`, so invalidating `['users']` refreshes every users query.
+- Wrap every `queryFn` with `withSignal`.
+- Use `placeholderData: keepPreviousData` on offset-paginated tables, so the old page stays visible while the next one loads.
+- Use `useInfiniteQuery` for cursor endpoints, through `infiniteQueryOptions` factories. Set `initialPageParam: undefined` and `getNextPageParam: (last) => last.meta.nextCursor ?? undefined`, and flatten `data.pages` during render.
+- Seed client queries with server data through `initialData`.
+- After a mutation, update the cache with `setQueryData` when the response has the new data. Otherwise invalidate the narrowest key prefix.
+- Read `isPending` from the mutation for loading state.
+
+Never:
+- Copy query data into `useState`.
+- Call `refetch` in an effect.
+- Put server data in a global store. React Query is the store for server data.
+
+## 5. React 19 and the React Compiler
+
+The React Compiler is on. It memoizes components and values during the build. The `react-hooks` ESLint rules flag code the compiler can't handle, and they run as errors.
+
+Must:
+- Pass `ref` as a normal prop.
+- Use `useTransition` for non-urgent updates and `useOptimistic` for instant feedback on row actions.
+- Use `useFormStatus` inside a form's submit component when the form uses an action.
+- Use `use(promise)` with a `Suspense` boundary when a server component passes a promise down.
+- Use `useEffectEvent` for effect logic that reads the latest props without re-running the effect.
+- Treat props, state and values from hooks as read-only.
+
+Never:
+- Use `forwardRef`.
+- Add `useMemo`, `useCallback` or `memo` by default. Add one only after profiling shows a problem, with a comment stating what you measured.
+- Read or write `ref.current` during render.
+- Mutate an object or array after passing it to JSX or a hook.
+- Disable a `react-hooks` rule.
+
+## 6. Effects and `set-state-in-effect`
+
+`react-hooks/set-state-in-effect` flags calling `setState` synchronously in an effect body. Each case triggers an extra render and usually means state is copied from somewhere it already exists.
+
+Use these patterns instead.
+
+| Situation | Pattern |
+|---|---|
+| A value derived from props or query data | Compute it during render: `const rows = data?.items ?? []` |
+| Local edits on top of server data | Initialize once with `useState(() => initial)`, and remount with a new `key` when the source changes |
+| Resetting state when an ID changes | Put `key={id}` on the component |
+| A response to a user action | Set state in the event handler or the mutation's `onSuccess` |
+| Browser values such as media queries or online status | `useSyncExternalStore`, or the existing `useMobile` hook |
+| Debounced values | `useDebouncedValue`, which sets state in a timer callback |
+| Dialog forms | Render the form inside the dialog only while it's open, so it mounts with fresh state |
+
+```tsx
+// Bad: copies query data into state
+const [rows, setRows] = useState<User[]>([]);
+useEffect(() => {
+  if (data) setRows(data.items);
+}, [data]);
+
+// Good: derive during render
+const rows = data?.items ?? [];
+```
+
+Effects are still right for subscriptions, timers, third-party widgets and syncing with the DOM. Set state there only inside callbacks, never in the effect body.
+
+## 7. URL state
+
+Must:
+- Keep table filters, search, sort, page and page size in the URL through `useTableUrlState`, which wraps `nuqs`. Cursor tables leave the cursor out of the URL.
+- Define parsers once per table, with defaults matching the backend DTO defaults.
+- Reset `page` to 1 whenever a filter, the search or the sort changes. `useTableUrlState` does this.
+- Parse the same search params in the server page with the matching `nuqs` server cache, so the server's first fetch and the client agree.
+
+Never:
+- Keep table filters only in `useState`. A reload or a shared link would lose them.
+
+## 8. Copy constants
+
+No i18n is set up. Keeping copy in constants makes adding `next-intl` later a matter of swapping these constants for message files.
+
+Must:
+- Put user-facing text in `src/constants/copy/<feature>.ts` as an `as const` object (`USERS_COPY`, `AUTH_COPY`).
+- Write functions in the copy object for text with values (`SHOWING_RANGE: (from: number, to: number, total: number) => ...`).
+
+Never:
+- Write UI sentences, labels or toast messages inline in JSX. Accessibility labels count as copy too.
+
+## 9. Auth on the frontend
+
+Must:
+- Let `proxy.ts` redirect signed-out users away from `/admin/**` and `/account/**`, and refresh an expired access token before the page renders.
+- Check the user's role on the server in `(admin)/admin/layout.tsx` through `getCurrentUserServer()`. Redirect anyone without an `ADMIN_PORTAL_ROLES` role.
+- Use `ROUTES` constants for every path.
+- Pass `?next=` values through `sanitizeRedirectPath` after login.
+
+Never:
+- Decode the JWT in the browser. Use `/users/me`.
+- Treat hiding a link as access control.
+
+## 10. Errors and loading
+
+Must:
+- Give each route group a `loading.tsx` and an `error.tsx`.
+- Show mutation errors with a `sonner` toast, using `ApiError.message`.
+- Throw `notFound()` from server pages when a record doesn't exist.
+
+## 11. Page speed and Core Web Vitals
+
+The feature comes first. Build it working and correct, then apply these items where they cost little. Never delay a feature to chase a score. Tell the user about any larger optimization you skipped, so they can schedule it.
+
+These are the targets, measured on a mid-range phone.
+
+| Metric | Measures | Target |
+|---|---|---|
+| FCP (First Contentful Paint) | Time until the first text or image shows | Under 1.8 s |
+| LCP (Largest Contentful Paint) | Time until the main content, usually the hero image or heading, shows | Under 2.5 s |
+| CLS (Cumulative Layout Shift) | How much the layout jumps while loading | Under 0.1 |
+| INP (Interaction to Next Paint) | Delay between a click and the screen updating | Under 200 ms |
+| TTFB (Time to First Byte) | Time until the server starts responding | Under 0.8 s |
+
+Free wins that cost nothing extra. Follow them while writing the feature.
+- Render on the server by default (section 2). Less client JavaScript means faster FCP and INP.
+- Fetch independent data in parallel with `Promise.all` in server components. Sequential `await`s add their delays together.
+- Wrap slow server sections in `Suspense` with a skeleton, so the rest of the page streams first.
+- Size skeletons to match the content they replace, so the layout doesn't jump when data arrives.
+- Use `next/image` with `sizes`, and `priority` on the LCP image only. Use `next/font`. Both are in `frontend-seo-marketing.mdc`.
+- Keep event handlers light. Move heavy work into `useTransition`, so typing and clicking stay responsive.
+
+Cheap wins worth doing when you touch the code.
+- Load heavy client-only components with `next/dynamic` when they aren't visible on first paint. Examples are rich text editors, charts, maps and large dialogs.
+- Import only the functions you use from large libraries.
+- Check the route sizes that `next build` prints. Look into any route that grows by more than about 50 KB of JavaScript.
+
+Measure before deeper work.
+- Use Lighthouse in Chrome DevTools in mobile mode on a production build (`npm run build` then `npm run start`). Dev mode numbers are not meaningful.
+- Use the React DevTools Profiler to find slow renders before changing component code.
+- Only after measuring, consider caching changes, splitting routes or adding memoization.
+
+## Review checklist
+
+- [ ] Pages and layouts are server components. `"use client"` sits on small leaf components only.
+- [ ] No client component imports a `*.server.ts` file.
+- [ ] Components and hooks never call axios or `fetch`. Services unwrap the envelope and accept a signal.
+- [ ] Queries use `queryOptions` factories, constant keys, `withSignal` and `keepPreviousData` for tables.
+- [ ] No query data is copied into state, and no `setState` runs in an effect body.
+- [ ] No `forwardRef`, and no `useMemo`, `useCallback` or `memo` without a measured reason.
+- [ ] Table state lives in the URL, and filter changes reset the page.
+- [ ] UI text comes from copy constants.
+- [ ] Admin pages check the role on the server.
+- [ ] Each route group has `loading.tsx` and `error.tsx`.
+- [ ] Performance, non-blocking. Server data fetches run in parallel, skeletons match content size, and heavy client-only components load with `next/dynamic`. Note any skipped optimization for the user instead of holding the feature.

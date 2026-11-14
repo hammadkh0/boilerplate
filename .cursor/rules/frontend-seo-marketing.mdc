@@ -1,0 +1,104 @@
+---
+description: Page metadata, SEO files and public page rules. Titles and descriptions, Open Graph, robots, sitemap, favicon, 404, CTA placement, sticky mobile CTA, images, thank-you and legal pages.
+globs: frontend/src/app/**,frontend/src/components/marketing/**,frontend/src/config/**
+alwaysApply: false
+---
+
+# SEO, metadata and public pages
+
+Search engines and link previews read these pages before any user does. Every rule here has a matching file in `src/app/` that already exists. Edit it, don't recreate it.
+
+## 1. Title and description on every page
+
+Must:
+- Export `metadata` or `generateMetadata` from every `page.tsx`, including admin, auth and error pages.
+- Give each page a unique `title` and a `description` of 120 to 160 characters that says what the page offers.
+- Keep the root layout's `title.template` (`%s | <site name>`) from `site.config.ts`, so pages set only their own part.
+- Take the site name, URL, tagline and contact details from `siteConfig`. Never repeat them as literals.
+- Set `alternates.canonical` on public pages.
+- Set `robots: { index: false, follow: false }` on admin, account, auth and thank-you pages.
+
+```tsx
+export const metadata: Metadata = {
+  title: PRIVACY_COPY.META_TITLE,
+  description: PRIVACY_COPY.META_DESCRIPTION,
+  alternates: { canonical: ROUTES.PRIVACY },
+};
+```
+
+## 2. Site files
+
+| File | Purpose | Rule |
+|---|---|---|
+| `app/robots.ts` | robots.txt | Disallows `/admin`, `/account` and the auth routes. Points to the sitemap. |
+| `app/sitemap.ts` | sitemap.xml | Lists every public route with `lastModified`. Add a route here in the same change that creates the page. |
+| `app/manifest.ts` | Web app manifest | Name, colors and icons from `siteConfig`. |
+| `app/icon.png`, `app/apple-icon.png` | Favicon and Apple touch icon | Replace the image files when rebranding. Don't add `<link>` tags by hand. |
+| `app/opengraph-image.tsx` | Default Open Graph image, 1200 by 630 | Renders the site name and tagline from `siteConfig`. Pages with their own share image add an `opengraph-image.tsx` in their folder. |
+| `app/not-found.tsx` | Custom 404 | Has a heading, a short explanation and links home and to login. Server pages call `notFound()` to reach it. |
+
+Must:
+- Set `metadataBase` in the root layout from `siteConfig.url`, so Open Graph URLs resolve.
+- Set `openGraph` and `twitter` (`summary_large_image`) defaults in the root layout.
+
+## 3. Landing page
+
+Must:
+- Put the headline, one supporting sentence and the primary CTA in the hero. The CTA must be visible without scrolling at 375 by 667 and at 1280 by 800.
+- Point the primary CTA at one action, which is register by default, using `ROUTES`.
+- Keep the section order: hero, features, how it works, FAQ, footer.
+- Show `StickyMobileCta` below the `md` breakpoint once the hero scrolls out of view. Add bottom padding to the page so the bar never covers the footer links.
+- Add FAQ structured data (`FAQPage` JSON-LD) built from the same copy constant that renders the FAQ.
+- Render marketing sections as server components. The sticky CTA and the mobile menu are the only client components.
+
+Never:
+- Put a carousel or autoplay video in the hero.
+- Add a second competing primary CTA above the fold.
+
+## 4. Images
+
+Must:
+- Use `next/image` for every image.
+- Write `alt` text that describes what the image shows or does. Use `alt=""` only for decorative images.
+- Set `sizes` on responsive images, so the browser downloads the right width.
+- Add `priority` only to the largest image above the fold.
+- Compress static images before committing them. Use WebP or AVIF for photos, SVG for logos and icons, and keep photos under about 200 KB.
+- Give images explicit `width` and `height`, or `fill` inside a sized container, so the layout doesn't shift while they load.
+
+Never:
+- Use a plain `<img>` tag.
+- Commit uncompressed PNG or JPEG photos.
+- Write alt text such as "image" or "photo", or repeat the file name.
+
+## 5. Public pages
+
+| Route | Content |
+|---|---|
+| `/privacy` | Privacy policy using `siteConfig` for the company name and contact email. Marked as a template the project must replace. |
+| `/terms` | Terms and conditions, same pattern as privacy. |
+| `/thank-you` | Shown after registration. Tells the user to check their inbox for the verification email, offers a resend button (a `LoadingButton` with cooldown) and links to login. Not indexed. |
+
+Must:
+- Link Privacy and Terms from the footer and from the register form.
+- Show a "last updated" date on legal pages.
+
+## 6. Performance
+
+Must:
+- Load fonts with `next/font` in the root layout.
+- Keep public pages static. Avoid `cookies()`, `headers()` and `no-store` fetches in marketing routes.
+- Avoid client-side JavaScript on public pages beyond the sticky CTA, the mobile menu and the theme toggle.
+
+Never:
+- Load third-party scripts without `next/script` and a `strategy`.
+
+## Review checklist
+
+- [ ] Every new page exports `metadata` or `generateMetadata` with a unique title and a 120 to 160 character description.
+- [ ] Private pages set `robots: { index: false }`. Public pages set a canonical URL.
+- [ ] New public routes are in `sitemap.ts`. Private routes are disallowed in `robots.ts`.
+- [ ] Site name, URL and contact details come from `siteConfig`.
+- [ ] The hero CTA is visible without scrolling at 375 and 1280 px, and the sticky mobile CTA works.
+- [ ] Every image uses `next/image` with meaningful `alt`, `sizes` and dimensions. Static images are compressed.
+- [ ] Privacy and Terms are linked from the footer and the register form.
+- [ ] Marketing pages stay static and server-rendered.

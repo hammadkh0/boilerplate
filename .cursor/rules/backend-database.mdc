@@ -1,0 +1,286 @@
+---
+description: Prisma and Postgres query rules. Select and where discipline, nested selects, N+1 and batching, transactions, list endpoints with offset or cursor pagination, null vs undefined, soft delete, migrations, plus a MongoDB appendix.
+globs: backend/**
+alwaysApply: false
+---
+
+# Database and Prisma
+
+Every query costs a network round trip and database time. Write the fewest queries that return the smallest correct result.
+
+## 1. Select only what the caller needs
+
+Must:
+- Give every query that returns data to a client an explicit `select`.
+- Define reusable selects as `const` objects with `satisfies Prisma.UserSelect` in the module's `constants/`, and derive the result type with `Prisma.UserGetPayload<{ select: typeof X }>` in `types/`.
+- Select relations with a nested `select`, not `include`. `include` returns every scalar field of the relation.
+- Use `_count` in `select` for relation counts instead of loading the relation.
+
+Never:
+- Return a full model from a client-facing query.
+- Use `include: { relation: true }` on a client-facing query.
+- Select sensitive fields (`passwordHash`, any token hash, `tokenVersion`) outside auth code that needs them.
+
+```ts
+// constants/index.ts
+export const ADMIN_USER_LIST_SELECT = {
+  id: true,
+  email: true,
+  fullName: true,
+  role: true,
+  status: true,
+  emailVerifiedAt: true,
+  createdAt: true,
+} satisfies Prisma.UserSelect;
+
+// types/index.ts
+export type AdminUserListItem = Prisma.UserGetPayload<{ select: typeof ADMIN_USER_LIST_SELECT }>;
+```
+
+## 2. Where conditions
+
+Must:
+- Filter in the database. Never fetch rows and filter them in JavaScript.
+- Build `where` once and reuse the same object for `findMany` and `count`.
+- Type it as `Prisma.<Model>WhereInput`.
+- Spread optional filters only when they have a value (`...(role && { role })`).
+- Pass every ownership or tenant value through `requireDefined` (section 7).
+- Use `findUnique` for lookups by `id` or another unique field.
+
+Never:
+- Write `where: { ownerId: dto.ownerId }` when `dto.ownerId` can be `undefined`. Prisma drops the condition and the query matches every row.
+- Use `findFirst` when a unique lookup exists.
+
+## 3. No N+1 queries
+
+An N+1 is a query inside a loop. Twenty rows become twenty-one queries.
+
+Must:
+- Load related data for many rows in one query with `where: { id: { in: ids } }`, then map the results in memory with a `Map`.
+- Use a nested `select` when one query can return the relation.
+- Use `groupBy`, `count` or `aggregate` for totals instead of loading rows to count them.
+- Use `createMany` and `updateMany` for bulk writes.
+- When a loop of writes is unavoidable, cap concurrency with `mapWithConcurrency`.
+
+Never:
+- `await` a query inside `for`, `forEach`, `map` or `reduce`.
+- Call a helper inside a loop when that helper runs a query. Check what a helper does before calling it in a loop.
+- Run the same lookup twice in one request. Pass the first result along.
+
+```ts
+// Bad: one query per actor
+for (const log of logs) {
+  log.actor = await this.prisma.user.findUnique({ where: { id: log.actorId } });
+}
+
+// Good: one query in total, using a nested select
+const logs = await this.prisma.auditLog.findMany({
+  where,
+  select: { id: true, action: true, createdAt: true, actor: { select: { id: true, fullName: true } } },
+});
+```
+
+## 4. Parallel and dependent queries
+
+Must:
+- Run independent reads together with `Promise.all`, or with `$transaction([...])` when they must see the same snapshot (a list and its count).
+- Run dependent queries in sequence only when the second needs the first's result.
+
+Never:
+- Run a "does it exist" check followed by an update when one `update` with a unique `where` does both. Catch `P2025` (record not found) in the filter instead.
+- Check uniqueness with a `findUnique` before `create`. Let the unique constraint fail, then map it with `toUserConflictException`.
+
+## 5. Transactions
+
+Must:
+- Wrap writes that must succeed or fail together in `prisma.$transaction(async (tx) => { ... }, PRISMA_TX_OPTIONS)`.
+- Use `tx` for every query inside the callback.
+- Keep transactions short. Do network calls such as email, S3 and HTTP after commit.
+- Write the audit log entry inside the same transaction as the admin action.
+
+Never:
+- Call `this.prisma` inside a transaction callback. That query runs outside the transaction.
+- Send email or call S3 inside a transaction.
+
+## 6. List endpoints
+
+Every table in the frontend has a list endpoint that supports pagination, search, filters and sorting. Pick one of two pagination strategies per endpoint.
+
+| Strategy | Use when | Frontend control |
+|---|---|---|
+| Offset (`page` and `limit`) | The table stays in the low thousands of rows, or users need to jump to a page or see "X to Y of Z". Examples are users and settings lists. | `DataTablePagination` with page numbers |
+| Cursor (`cursor` and `limit`) | The table can grow large, or rows arrive constantly and users read from newest to oldest. Examples are audit logs, activity feeds, notifications and messages. | `DataTableLoadMore`, or Previous and Next |
+
+Offset pagination makes Postgres read and discard every skipped row, so deep pages on large tables slow down. Cursor pagination starts from the last row seen and stays the same speed on every page. It can't jump to page N.
+
+### 6.1 Offset pagination
+
+```ts
+async listForAdmin(query: ListUsersQueryDto): Promise<PaginatedResult<AdminUserListItem>> {
+  const { page, limit, search, sortBy, sortOrder, role, status } = query;
+
+  const where: Prisma.UserWhereInput = {
+    ...buildSearchWhere(search, USER_SEARCH_FIELDS),
+    ...(role && { role }),
+    ...(status && { status }),
+  };
+
+  const [items, total] = await this.prisma.withSoftDelete.$transaction([
+    this.prisma.withSoftDelete.user.findMany({
+      where,
+      select: ADMIN_USER_LIST_SELECT,
+      orderBy: buildOrderBy(sortBy, sortOrder, USER_SORTABLE_FIELDS, { createdAt: 'desc' }),
+      ...buildPaginationArgs({ page, limit }),
+    }),
+    this.prisma.withSoftDelete.user.count({ where }),
+  ]);
+
+  return buildPaginatedResult(items, total, page, limit);
+}
+```
+
+Must:
+- Accept `page`, `limit`, `search`, `sortBy` and `sortOrder` through `PaginationQueryDto`.
+- Return `{ items, meta: { page, limit, total, totalPages } }` through `buildPaginatedResult`.
+
+### 6.2 Cursor pagination
+
+The cursor is the `id` of the last row on the previous page. The query fetches one extra row to learn whether another page exists, so it needs no `count`.
+
+```ts
+async listForAdmin(query: ListAuditLogsQueryDto): Promise<CursorPaginatedResult<AuditLogListItem>> {
+  const { cursor, limit, search, sortOrder, action, actorId } = query;
+
+  const where: Prisma.AuditLogWhereInput = {
+    ...buildSearchWhere(search, AUDIT_LOG_SEARCH_FIELDS),
+    ...(action && { action }),
+    ...(actorId && { actorId }),
+  };
+
+  const rows = await this.prisma.auditLog.findMany({
+    where,
+    select: AUDIT_LOG_LIST_SELECT,
+    orderBy: [{ createdAt: sortOrder }, { id: sortOrder }],
+    ...buildCursorArgs({ cursor, limit }),
+  });
+
+  return buildCursorResult(rows, limit);
+}
+```
+
+Must:
+- Accept `cursor`, `limit`, `search` and `sortOrder` through `CursorPaginationQueryDto`. Validate `cursor` with `@IsUUID('7')`.
+- Build `cursor`, `skip` and `take` with `buildCursorArgs`. It sets `take` to `limit + 1`.
+- Return `{ items, meta: { nextCursor, hasMore, limit } }` through `buildCursorResult`, which drops the extra row and sets `nextCursor` to the last returned `id`.
+- End `orderBy` with `id` in the same direction as the sort column, so the order has no ties.
+- Index the sort columns together with `id`, for example `@@index([createdAt, id])`.
+- Limit sorting to the indexed columns. Cursor lists usually sort by `createdAt` only.
+
+Never:
+- Run a `count` on every cursor page. If the UI needs a total, expose it from a separate endpoint and cache it.
+- Build the cursor from a non-unique column alone.
+
+### 6.3 Rules for both strategies
+
+Must:
+- Default `limit` to 20 and cap it at 100.
+- Declare searchable fields (`USER_SEARCH_FIELDS`) and sortable fields (`USER_SORTABLE_FIELDS`) as constants.
+- Always set an `orderBy` with a stable tiebreaker, so rows don't repeat or vanish across pages.
+- Add an index for every column used in a filter or sort. Composite indexes put equality filters first and the sort column last.
+- Pick the strategy when creating the endpoint, and say which one in the handler's JSDoc.
+
+Never:
+- Return an unpaginated list from an endpoint the frontend shows as a table.
+- Use `limit = Number.MAX_SAFE_INTEGER` or any default that disables paging.
+- Use offset pagination for a table expected to pass about 10,000 rows when users browse it page by page.
+
+## 7. Null vs undefined
+
+Postgres has no "unset" state, but Prisma treats `undefined` and `null` differently, and mixing them up causes data leaks and lost data.
+
+| Value | In `where` | In `data` |
+|---|---|---|
+| `undefined` | Prisma drops the condition | Prisma leaves the column untouched |
+| `null` | Matches rows where the column is NULL | Sets the column to NULL |
+
+Must:
+- Pass values that must restrict a query through `requireDefined(value, 'ownerId')`. It throws if the value is `undefined`.
+- Build PATCH payloads with `buildPatchData(dto)`. It keeps `null`, which clears a column, and drops `undefined`, which leaves the column alone.
+- Validate non-nullable optional DTO fields with `@IsOptionalNonNull()`, so a client can't send `null` to a required column.
+- Use `RemoveUndefinedPipe` when a handler forwards a query object to Prisma. It strips only `undefined`.
+
+Never:
+- Use `omitNullFields` on Postgres. It is for MongoDB (appendix below).
+- Write `field: value ?? null` in `data` unless clearing the column is the intent.
+
+## 8. Soft delete
+
+Models with `deletedAt` are listed in `SOFT_DELETE_MODELS`. `prisma.withSoftDelete` adds `deletedAt: null` to the `where` of reads on those models. `docs/PLAN.md` section 3.9 explains the design.
+
+Must:
+- Use `this.prisma.withSoftDelete` for reads on soft-deletable models.
+- Use the plain `this.prisma` client only to read deleted rows on purpose, such as an admin restore. Add a comment saying so.
+- Delete with `softDelete(model, id)`. For users it also bumps `tokenVersion`, clears the refresh hash and frees the email.
+- Add `where: { deletedAt: null }` to any nested `select` or `include` of a soft-deletable relation. The extension doesn't reach nested relations.
+- Add `deletedAt: null` to the `where` of `update` and `updateMany` on soft-deletable models. The extension only covers reads.
+- Add a new soft-deletable model to `SOFT_DELETE_MODELS` in the same change that adds its `deletedAt` column.
+
+Never:
+- Call `delete` or `deleteMany` on a soft-deletable model, except in a retention job that purges on purpose.
+
+## 9. Schema and migrations
+
+Must:
+- Use `@id @default(uuid(7)) @db.Uuid` for primary keys and `@db.Uuid` for foreign keys.
+- Give every model `createdAt @default(now())` and `updatedAt @updatedAt`.
+- Add `@@index` for each foreign key and each column used in filters or sorting.
+- Name models and enums in PascalCase (`UserStatus`) and enum values in SCREAMING_SNAKE_CASE (`ACTIVE`). Map table names with `@@map("snake_case")`.
+- Create migrations with `npx prisma migrate dev --name <change>` and commit them.
+- Give new non-nullable columns on existing tables a default, or add them in two steps.
+
+Never:
+- Edit a migration that has been applied anywhere else.
+- Use `prisma db push` outside throwaway local experiments.
+
+## 10. Raw SQL
+
+Must:
+- Prefer the Prisma client. Use `$queryRaw` tagged templates only for queries Prisma can't express, and add a comment saying why.
+- Type raw results explicitly.
+
+Never:
+- Use `$queryRawUnsafe` with request values. See `security.mdc` section 5.
+
+## Appendix: MongoDB projects
+
+Only read this when a project uses Prisma with `provider = "mongodb"`.
+
+On MongoDB, an optional field can be missing from a document. Prisma's `{ field: null }` matches only documents that store an explicit `null`, and misses documents where the field is absent.
+
+Must:
+- Filter "empty" optional fields with `unsetOrNull('field')` or a `NOT_*` constant from `shared/helpers/mongo-optional-null.ts`.
+- Use `NOT_DELETED` inside transactions, where the soft-delete extension doesn't run.
+- Strip `null` keys from create payloads with `omitNullFields`, so documents leave fields absent instead of storing `null`.
+- Switch the soft-delete filter to `{ OR: [{ deletedAt: { isSet: false } }, { deletedAt: null }] }`.
+
+```ts
+// Bad: misses documents where deletedAt is absent
+where: { id, deletedAt: null }
+
+// Good
+where: { id, AND: [NOT_DELETED] }
+```
+
+## Review checklist
+
+- [ ] Every client-facing query has an explicit `select`. Relations use nested `select`, not `include`.
+- [ ] No query runs inside a loop, directly or through a helper.
+- [ ] Independent queries run in parallel. Lists run `findMany` and `count` in one `$transaction`.
+- [ ] Owner and tenant filters go through `requireDefined`.
+- [ ] PATCH handlers use `buildPatchData`. No accidental `?? null`.
+- [ ] List endpoints paginate with a capped `limit`, whitelisted sort and a stable `orderBy`.
+- [ ] The pagination strategy fits the table. Large or append-only lists use cursor pagination, end `orderBy` with `id` and skip `count`.
+- [ ] Reads use `withSoftDelete`. Nested relations and updates filter `deletedAt: null` themselves.
+- [ ] Transactions use `tx` throughout and make no network calls.
+- [ ] New filter and sort columns have indexes. New migrations are committed.
+- [ ] No `$queryRawUnsafe` with request values.

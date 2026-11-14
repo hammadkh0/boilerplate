@@ -1,0 +1,209 @@
+---
+description: NestJS backend architecture. Module layout, controllers, services, DTOs, guards, responses, errors, config, logging, emails, uploads and audit logging.
+globs: backend/**
+alwaysApply: false
+---
+
+# Backend architecture
+
+The backend is NestJS 11 with Prisma on Postgres. The layout follows Driving-Test. `docs/PLAN.md` section 3 has the full tree. Database rules live in `backend-database.mdc`.
+
+## 1. Module layout
+
+Every feature is a folder under `src/modules/`.
+
+```
+src/modules/users/
+  users.module.ts
+  users.controller.ts             every users route: /users/me routes and admin routes
+  users.service.ts
+  dto/
+    index.ts
+    list-users-query.dto.ts
+    update-user-status.dto.ts
+  helpers/  constants/  types/    each with index.ts, created only when needed
+```
+
+Must:
+- Give each module one controller, `<feature>.controller.ts`, holding every route for that feature. Public, signed-in user and admin routes sit in the same class.
+- Keep the module, controller and service files at the module root.
+- Split a large service by concern into more root-level files (`auth.service.ts`, `token.service.ts`).
+- Export from a module only the services other modules use.
+- Put cross-module code in `src/modules/shared/`.
+
+Never:
+- Split one feature's routes across several controller files (`users-me.controller.ts`, `users-admin.controller.ts`).
+- Import another module's internal file directly. Import its service and list it in that module's `exports`.
+- Create a repository layer. Services call `PrismaService` directly since PrismaService will be global.
+
+## 2. Controllers
+
+Controllers translate HTTP into service calls. They hold no business logic.
+
+Must:
+- Keep each handler to its decorators plus one service call.
+- Add Swagger decorators to every handler: `@ApiTags` on the class, plus `@ApiOperation` and `@ApiOkResponse` or the matching response decorator.
+- Type params with pipes (`@Param('id', ParseUUIDPipe) id: string`).
+- Use `@CurrentUser()` for the signed-in user.
+- Add `@HttpCode(HttpStatus.NO_CONTENT)` to handlers that return nothing.
+- Put `@Roles(...)` on every admin handler, listing the Prisma `Role` values allowed to call it (`@Roles(Role.SUPER_ADMIN)`). Because admin and user routes share a class, the role check sits on each method, not on the class.
+- Declare fixed paths such as `me` before parameter paths such as `:id`. Nest matches routes in declaration order, so `GET /users/me` would otherwise hit the `:id` handler.
+
+Never:
+- Call Prisma from a controller.
+- Use `@Res()` to write responses, except for streaming or file downloads. It bypasses the response interceptor.
+- Wrap a service call in `try/catch` just to rethrow.
+
+```ts
+@ApiTags('users')
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get('me')
+  @ApiOperation({ summary: 'Get the signed-in user' })
+  getMe(@CurrentUser() user: AuthUser) {
+    return this.usersService.getMe(user.id);
+  }
+
+  @Get()
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List users for the admin table' })
+  list(@Query() query: ListUsersQueryDto) {
+    return this.usersService.listForAdmin(query);
+  }
+
+  @Patch(':id/status')
+  @Roles(Role.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Suspend or activate a user' })
+  updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserStatusDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.usersService.updateStatus(id, dto, actor);
+  }
+}
+```
+
+## 3. Services
+
+Must:
+- Put business rules, Prisma calls and calls to other services here.
+- Throw Nest exceptions (`NotFoundException`, `ConflictException`, `ForbiddenException`, `BadRequestException`) with a plain message the client can show.
+- Run multi-step writes in one transaction. See `backend-database.mdc` section 5.
+- Record admin actions through `AuditLogService.record` inside the same transaction as the change.
+- Keep a service under about 300 lines. Split by concern (`auth.service.ts`, `token.service.ts`) before that.
+
+Never:
+- Swallow an error and return `null` or `{ success: false }`. Throw instead.
+- Return Prisma error objects or raw error messages.
+
+## 4. DTOs and validation
+
+Must:
+- Write one class per request shape in `dto/`, named `<action>-<resource>.dto.ts` with a matching class name (`UpdateUserStatusDto`).
+- Put `class-validator` and `@ApiProperty` or `@ApiPropertyOptional` decorators on every field.
+- Set limits on every field, as `security.mdc` section 4 describes.
+- Extend `PaginationQueryDto` for list queries. Add filters as optional typed fields.
+- Use `@Type(() => Number)` and `@Transform(({ value }) => parseBoolean(value))` for query params, because query values arrive as strings.
+- Use `@IsOptionalNonNull()` instead of `@IsOptional()` when a field may be left out but must never be `null`. `@IsOptional()` lets `null` through.
+- Use `@IsEnum(PrismaEnum)` with the enum from `@prisma/client`.
+
+Never:
+- Reuse a request DTO as a response type.
+- Use `@IsOptional()` on a field that maps to a non-nullable column.
+
+## 5. Guards and decorators
+
+The app registers `JwtAuthGuard`, `RolesGuard` and `ThrottlerGuard` globally as `APP_GUARD`, and `OriginGuard` for state-changing requests.
+
+Must:
+- Use `@Public()` only for routes that anonymous users need, such as login, register and health.
+- Use `@Roles(...)` with `Role` enum values from `@prisma/client` on every admin handler. List the roles each route needs, so routes such as deleting users or changing roles can stay stricter than the rest.
+- When a new role such as `ADMIN` is added, review each admin handler and add the role where it belongs.
+- Use `@Throttle` on sensitive routes, as `security.mdc` section 12 describes.
+
+Never:
+- Add `@UseGuards(JwtAuthGuard)` to a controller. The global guard already runs.
+- Check roles by hand inside a service when `@Roles` can do it.
+
+## 6. Responses and errors
+
+`ResponseInterceptor` wraps every return value as `{ success: true, data }`. `HttpExceptionFilter` wraps errors as `{ success: false, error: { statusCode, message, details? } }`.
+
+Must:
+- Return plain data from services. The interceptor adds the envelope.
+- Return lists as `buildPaginatedResult(items, total, page, limit)`, which produces `{ items, meta }`.
+- Throw `BadRequestException` with field details when validation needs more than the DTO can express. The frontend maps `details` to form fields.
+
+Never:
+- Build the `{ success, data }` envelope by hand.
+- Return a different list shape.
+
+## 7. Config
+
+Must:
+- Inject `AppConfigService` and use its typed getters.
+- Add each new env variable to `config/env.schema.ts`, to `AppConfigService` and to `.env.example`.
+- Guard optional features with a flag such as `S3_ENABLED`. When the flag is on, the schema requires the feature's variables.
+
+Never:
+- Read `process.env` or call `ConfigService.get` outside `config/`.
+
+## 8. Logging
+
+Must:
+- Create a logger per class (`private readonly logger = new Logger(UsersService.name)`).
+- Log at `warn` for handled problems and `error` for failures, with the user or entity ID as context.
+- Keep the DB request-log module behind `HTTP_REQUEST_LOG_ENABLED`. When it's on, writes must not block the response.
+
+Never:
+- Use `console.*`.
+- Log anything listed in `security.mdc` section 11.
+
+## 9. Emails
+
+Must:
+- Send email through `EmailService` only.
+- Put templates in `emails/templates/` as EJS files, and render them with `renderEmailTemplate` and `buildEmailBranding`.
+- Build every link from `FRONTEND_URL`.
+- Send email after the database transaction commits, so a rollback never sends a message about a change that didn't happen.
+
+## 10. Uploads
+
+Must:
+- Use `UploadsService` for every S3 call.
+- Validate files with `FileValidationPipe`, giving it explicit size and type limits.
+- Store the S3 key in the database and generate presigned URLs when reading.
+
+Never:
+- Store presigned URLs in the database. They expire.
+- Create an `S3Client` outside `UploadsService`.
+
+## 11. Scheduled jobs
+
+Must:
+- Name each job with a constant from the module's `constants/`.
+- Process rows in batches with `chunk`, or `take` with a cursor, so a job never loads a whole table.
+- Make jobs safe to run twice.
+
+## 12. Tests
+
+Must:
+- Write a Jest unit test for every new helper in `shared/`.
+- Extend `test/auth.e2e-spec.ts` when changing auth behavior.
+- Name tests by behavior (`it('rejects a reused refresh token')`).
+
+## Review checklist
+
+- [ ] Each module has one controller. New code sits in the right file or subfolder, and barrels are updated.
+- [ ] Controllers call one service method per handler, have Swagger decorators and contain no Prisma calls.
+- [ ] Services throw Nest exceptions with plain messages and never swallow errors.
+- [ ] Every DTO field has validators, limits and an `@ApiProperty` decorator. Non-nullable optional fields use `@IsOptionalNonNull()`.
+- [ ] Every admin handler has `@Roles(...)` with `Role` enum values, and `me` routes come before `:id` routes. No redundant `@UseGuards`.
+- [ ] Lists return `buildPaginatedResult`. Nothing builds the envelope by hand.
+- [ ] Config goes through `AppConfigService`, and new variables are in the schema and `.env.example`.
+- [ ] Admin actions write an audit log entry in the same transaction.
+- [ ] Emails send after commit and use `FRONTEND_URL`.
+- [ ] New shared helpers have unit tests.

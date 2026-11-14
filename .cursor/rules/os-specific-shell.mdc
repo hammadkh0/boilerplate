@@ -1,0 +1,23 @@
+---
+description: Use shell commands matching the host OS; honor explicit OS requests
+alwaysApply: true
+---
+
+# OS-Specific Shell Commands
+
+Before running shell commands, use the host OS from user/system context (e.g. `win32`, macOS, Linux). Do not try Unix/Linux commands first and fall back after failure.
+
+## Defaults
+
+- **Windows** (`win32`): PowerShell / cmd. Prefer PowerShell idioms (`Get-ChildItem`, `$env:VAR`, `Join-Path`, `Select-Object`). Use Windows path separators or PowerShell-safe paths. Do not start with `ls`, `cat`, `rm`, `grep`, `&&` chaining, or bash heredocs unless the active shell is known to be bash/WSL.
+- **macOS / Linux**: bash/zsh. Use POSIX commands and forward-slash paths.
+
+## Explicit OS override
+
+If the user names an OS (e.g. "give me the Linux commands", "for macOS", "Windows PowerShell"), produce commands for **that** OS even when the host differs. Do not "correct" to the host OS.
+
+## Anti-patterns
+
+- Running `ls` / `cat` / `rm -rf` / `export FOO=bar` on Windows PowerShell as the first attempt
+- Using bash-only syntax (`&&`, `$(cat <<'EOF')`) on Windows without a bash shell
+- Ignoring an explicit OS request from the user

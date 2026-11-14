@@ -1,0 +1,157 @@
+---
+description: UI rules for the Next.js frontend. shadcn usage, admin shell template, tables with pagination, search and filters, forms and error states, loading buttons, responsive breakpoints, accessibility and theming.
+globs: frontend/**
+alwaysApply: false
+---
+
+# UI and shadcn
+
+The UI uses shadcn on Radix with Tailwind 4. The admin portal copies the look of the Driving-Test admin users page. `docs/PLAN.md` section 5 has the full spec.
+
+## 1. shadcn components
+
+Must:
+- Add components with the CLI (`npx shadcn@latest add <name>`), so they land in `src/components/ui/`.
+- Check `src/components/ui/` before adding anything. Use what exists.
+- Build feature components by composing `ui/` components in `src/components/<feature>/`.
+- Use `asChild` to render a shadcn component as another element (`<Button asChild><Link href={...} /></Button>`).
+- Use variants (`variant`, `size`) for styling differences. Add a new variant inside the `ui/` component's `cva` config when several features need it.
+- Use the right component for each job.
+
+| Need | Component |
+|---|---|
+| Confirming a destructive action | `AlertDialog` |
+| A form or details in a modal | `Dialog` on desktop, `Drawer` or `Sheet` on mobile when the content is tall |
+| Feedback after an action | `toast` from `sonner` |
+| A form field with label, description and error | `Field`, `FieldLabel`, `FieldDescription`, `FieldError` |
+| Options in a filter | `Select`, or `Combobox` (Popover with Command) when there are more than about 10 |
+| A row menu with more than three actions | `DropdownMenu` |
+| An icon-only button | `Button size="icon"` with a `Tooltip` and an `aria-label` |
+| Status labels | `Badge` |
+| Loading placeholders | `Skeleton` |
+| Empty results | `Empty` |
+
+Never:
+- Hand-write a component that shadcn provides (buttons, dialogs, selects, tooltips, tables).
+- Edit a `ui/` component for one feature's needs. Pass `className` or compose a wrapper.
+- Use raw Radix packages directly in feature code. Go through `ui/`.
+- Mix in another component library.
+- Use an icon set other than `lucide-react`.
+
+## 2. Theme and styling
+
+Must:
+- Use semantic color tokens (`bg-primary`, `text-muted-foreground`, `border-border`, `bg-destructive`). Define new colors as CSS variables in `globals.css` for both light and dark mode, then register them in the `@theme` block.
+- Use `cn()` to merge class names.
+- Check every screen in light and dark mode.
+
+Never:
+- Use hex values, `rgb()` or Tailwind palette colors (`bg-green-600`, `text-gray-500`) in components. Add a token instead, such as `--success`.
+- Use inline `style` for anything Tailwind can express.
+
+## 3. Admin portal shell
+
+The boilerplate ships the shell in `src/components/admin/`. It combines a sidebar for the main tabs with a top navbar for the account controls. It follows the shadcn `sidebar-07` block, which collapses to icons.
+
+Must:
+- Add admin pages under `src/app/(admin)/admin/` so they get the shell from `(admin)/admin/layout.tsx`.
+- Add sidebar links to the `ADMIN_NAV` constant, with an icon, a label from copy constants and a route from `ROUTES`. Group them under labels such as "Main". Use a collapsible item for sub-pages.
+- Keep the navbar to the sidebar trigger on the left, and the theme toggle and user menu on the right.
+- Start every admin page with `PageHeader` (title and description), then optional KPI cards, then the main content.
+- Keep the layout a server component. The sidebar, trigger, theme toggle and user menu are the client components.
+
+When a new project needs another portal:
+- For a sidebar portal, copy the `(admin)` layout and the `components/admin/` shell, and give it its own nav constant. If you need a fresh copy of the template, run `npx shadcn@latest add sidebar-07`, move the generated files into `components/<portal>/` and delete the demo parts (team switcher, projects list, sample data).
+- For a navbar-only portal, compose the marketing navbar pattern: `NavigationMenu` for desktop links, `Sheet` for the mobile menu and `DropdownMenu` for the avatar menu.
+
+Never:
+- Install `dashboard-01` or another full-page block into the project. They bring demo data and charts. Copy only the parts you need.
+- Build a second sidebar implementation.
+
+## 4. Tables
+
+Every table that lists records follows the users table in `src/components/users/`. The feature list below is required.
+
+Must:
+- Build tables from `src/components/data-table/`: `DataTable`, `TableToolbar`, `SortableHead`, `DataTablePagination`, `DataTableLoadMore` and `TableRefreshButton`.
+- Paginate on the server, with the control that matches the endpoint's strategy (`backend-database.mdc` section 6).
+  - For offset endpoints, use `DataTablePagination`. It has first, previous, page numbers with ellipsis, next and last buttons, a "showing X to Y of Z" label and a rows-per-page select using `PAGE_SIZE_OPTIONS`. The users table is the example.
+  - For cursor endpoints, use `DataTableLoadMore` with `useInfiniteQuery`. It shows a "Load more" `LoadingButton` while `hasMore` is true, and a "No more results" note after the last page. The audit log table is the example.
+- Give each table a search input with a search icon, debounced with `useDebouncedValue` (350 ms by default), and send it to the backend `search` param.
+- Give each table filters for its main enum and date fields, using `Select` with an "All" option.
+- Make sortable columns cycle through ascending, descending and off on click.
+- Keep search, filters, sort, page and page size in the URL through `useTableUrlState`. Changing any of them except the page resets the page to 1. Cursor tables keep search, filters and sort in the URL but not the cursor, and a filter change starts the list over.
+- Show one `Skeleton` row per row in the page while loading, an error row with the message on failure, and an `Empty` row when nothing matches.
+- Dim the table while a background refetch runs (`isFetching && !isLoading`).
+- Hide lower-priority columns on small screens with `hidden md:table-cell` or `hidden lg:table-cell`. Name and actions stay visible.
+- Make row actions icon buttons with a `Tooltip` and an `aria-label`. Destructive actions open an `AlertDialog`.
+- Match the styling: a `rounded-xl` bordered card, a dark primary header row, alternating row backgrounds and a filled primary Refresh button on the right of the toolbar.
+
+Never:
+- Fetch every row and paginate, filter or sort in the browser.
+- Fire a request on every keystroke.
+- Build a table as one large component. Split it into toolbar, columns, row actions and dialogs.
+- Copy `useDebouncedValue` or pagination math into a feature file.
+
+## 5. Forms
+
+Forms use React Hook Form, Zod and a React Query mutation.
+
+Must:
+- Define the schema in `src/schemas/<feature>.ts`, with the same length limits as the backend DTO. Infer the form type with `z.infer`.
+- Use `zodResolver(schema)` and render fields with `Field`, `FieldLabel`, `FieldError` and the matching `ui/` input.
+- Show an error under each invalid field, and connect it with `aria-invalid` and `aria-describedby`. `Field` handles both.
+- Map backend `400` field errors onto the form with `setError`, using the `mapApiFieldErrors` helper.
+- Show form-level errors, such as "Invalid email or password", in `FormErrorAlert` above the submit button.
+- Submit with `mutation.mutate` and show success with a toast or a redirect.
+- Give inputs the right `type`, `autoComplete` and `inputMode` (`email`, `current-password`, `new-password`, `one-time-code`).
+- Use `PasswordInput` for passwords. It has a show and hide toggle.
+
+Never:
+- Validate only on the backend or only on the frontend.
+- Clear the form when a submission fails.
+- Show raw error objects or status codes to the user.
+
+## 6. Loading states on buttons
+
+Must:
+- Use `LoadingButton` for every button that starts a request: form submits, confirm buttons in dialogs, row actions and refresh.
+- Pass the pending state (`loading={mutation.isPending}`). The button disables itself, shows a spinner and keeps its width.
+- Disable the dialog's cancel and close controls while its confirm action is pending.
+
+Never:
+- Leave a request button clickable while its request is in flight.
+- Replace the button label with a spinner only. Keep the label and add the spinner beside it.
+
+## 7. Responsive layout
+
+Must:
+- Write mobile styles first and add `sm:`, `md:`, `lg:` and `xl:` overrides.
+- Check every screen at 375 px, 768 px and 1280 px.
+- Make touch targets at least 40 px tall on mobile.
+- Stack toolbars vertically on mobile (`flex-col gap-3 lg:flex-row`).
+- Scroll wide tables horizontally inside their card, never the whole page.
+
+Never:
+- Use fixed pixel widths on containers. Use `max-w-*` and `w-full`.
+
+## 8. Accessibility
+
+Must:
+- Give every input a visible label or an `aria-label` from copy constants.
+- Give icon-only buttons an `aria-label`, and mark decorative icons `aria-hidden`.
+- Keep keyboard focus visible. shadcn's focus ring is the default, so don't remove it.
+- Use semantic elements: `button` for actions, `a` or `Link` for navigation, and one `h1` per page.
+- Show status with text or an icon as well as color.
+
+## Review checklist
+
+- [ ] Components come from `ui/` through the shadcn CLI. No hand-built replacements and no feature edits to `ui/`.
+- [ ] Colors use semantic tokens. No hex values or palette classes.
+- [ ] Admin pages sit under `(admin)/admin/`, start with `PageHeader` and are linked in `ADMIN_NAV`.
+- [ ] Every table has server pagination with the control matching its strategy, plus debounced search, filters, sorting and URL state.
+- [ ] Tables show skeleton, error and empty rows, and hide low-priority columns on small screens.
+- [ ] Forms use Zod schemas, `Field` errors, backend error mapping and `FormErrorAlert`.
+- [ ] Every request button is a `LoadingButton` with its pending state wired.
+- [ ] Screens work at 375, 768 and 1280 px in light and dark mode.
+- [ ] Icon buttons have `aria-label` and a tooltip. Inputs have labels.

@@ -1,0 +1,165 @@
+---
+description: Core coding standards for the whole repo. Writing style, comments, constants, module structure, helper reuse, TypeScript and tooling.
+alwaysApply: true
+---
+
+# Core standards
+
+These rules apply to every file in `backend/` and `frontend/`, and to docs, commit messages and chat replies.
+
+## 1. Writing style
+
+Must:
+- Use a period or a comma where you would reach for a dash.
+
+Never:
+- Write an em dash (`—`) anywhere. That includes code, comments, JSDoc, UI copy, docs, commit messages and chat replies.
+- Swap in an en dash (`–`) or a spaced hyphen (` - `) as a dash substitute.
+
+```ts
+// Bad
+/** Returns the user — or null if the account was deleted. */
+
+// Good
+/** Returns the user, or null if the account was deleted. */
+```
+
+## 2. Comments and JSDoc
+
+A comment exists to save the next reader time. It states something the code can't show, such as a business rule, a constraint, a security reason, a block of code or a performance choice.
+
+Must:
+- Add JSDoc to every exported helper, hook, guard, decorator, pipe and interceptor.
+- Add JSDoc to service methods when the name doesn't tell the whole story. Examples are methods that throw on purpose, mutate several tables, or have ordering rules.
+- In JSDoc, say what the function returns, when it throws and what the caller must respect. Use `@param` only when a parameter's meaning isn't obvious from its name and type.
+- Put a short comment above a block when it encodes a rule a reader couldn't infer. Examples are "Refresh tokens are hashed with SHA-256 because bcrypt truncates input at 72 bytes" and "Count runs in the same transaction so totals match the page".
+
+Never:
+- Restate the code (`// loop over users`, `// call the service`, `// return the result`).
+- Talk to a reviewer (`// fixed`, `// changed from X`, `// as requested`, `// new helper`).
+- Leave commented-out code. Delete it, since git keeps the history.
+- Write a `TODO` without a reason. Use `// TODO: <what and why>`.
+- Add a JSDoc block that only repeats the function name (`/** Gets the user. */` on `getUser`).
+
+```ts
+// Bad
+// Get users
+const users = await this.prisma.withSoftDelete.user.findMany({ where, select });
+
+// Good
+/**
+ * Lists users for the admin table.
+ * Throws BadRequestException when `sortBy` is not in USER_SORTABLE_FIELDS.
+ * Never returns password or token hashes.
+ */
+async listForAdmin(query: ListUsersQueryDto): Promise<PaginatedResult<AdminUserListItem>> {
+```
+
+## 3. No magic strings for domain values
+
+Domain values are roles, statuses, action types, sort fields, cookie names, query keys, route paths and storage folders. Compare, assign and branch on them through constants only.
+
+Must:
+- On the backend, use Prisma enums from `@prisma/client` for values stored in the database. Put every other domain value in an `as const` object in the module's `constants/` folder, or in `shared/constants/` when several modules use it.
+- On the frontend, mirror Prisma enums with the same string values in `src/constants/`, and derive types in `src/types/`.
+- Name constant objects and their keys in SCREAMING_SNAKE_CASE.
+- Derive types from the constant. Never write a separate string union.
+
+Never:
+- Compare against a raw string (`user.role === 'SUPER_ADMIN'`).
+- Define a constant object inside a `types/` file, or a type inside a `constants/` file.
+
+```ts
+// frontend/src/constants/user.ts
+export const USER_STATUS = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+// frontend/src/types/user.ts
+import type { USER_STATUS } from '@/constants';
+export type UserStatus = (typeof USER_STATUS)[keyof typeof USER_STATUS];
+
+// Bad
+if (user.status === 'SUSPENDED') {}
+
+// Good
+if (user.status === USER_STATUS.SUSPENDED) {}
+```
+
+Out of scope: user-facing copy, log messages, exception messages, database table and column names, and import paths. On the frontend, user-facing copy goes in copy constants (see `frontend-architecture.mdc`).
+
+## 4. Module structure and barrels
+
+Must:
+- Follow the folder trees in `docs/PLAN.md` sections 3.2 and 4.2. Ask before adding a new top-level folder.
+- Keep a backend module's `<feature>.module.ts`, `<feature>.controller.ts` and service files at the module root.
+- Give each subfolder (`dto/`, `helpers/`, `constants/`, `types/`) an `index.ts` barrel that re-exports that folder only.
+- Import a subfolder through its barrel (`../users/dto`), never a deep file path inside it.
+- Keep `constants/` to `as const` objects and literal values, `types/` to types and interfaces, and `helpers/` and `utils/` to functions.
+- Start new constants, types or helpers in the folder's `index.ts` or one existing file. Split into a sibling file when the file passes about 200 lines or holds two unrelated concerns.
+
+Never:
+- Create a barrel at a module root.
+- Create circular imports between barrels.
+- Create one file per tiny constant.
+
+## 5. Reuse helpers before writing new ones
+
+Both apps ship a large helper library. Writing a duplicate is a bug.
+
+Must:
+- Before writing a helper, search `backend/src/modules/shared/` (`utils/`, `helpers/`, `decorators/`, `pipes/`, `validators/`) or `frontend/src/lib/` and `frontend/src/hooks/`.
+- When an existing helper is close but not right, extend it with an option instead of writing a second one.
+- Put a new helper that two or more modules need in `shared/` (backend) or `lib/` (frontend), with JSDoc and a unit test on the backend.
+
+Helpers people forget most often:
+
+| Need | Backend | Frontend |
+|---|---|---|
+| Offset pagination | `buildPaginationArgs`, `buildPaginatedResult` | `getPageNumbers`, `getPaginationRange`, `DataTablePagination` |
+| Cursor pagination | `buildCursorArgs`, `buildCursorResult` | `DataTableLoadMore`, `infiniteQueryOptions` factories |
+| Search and sort | `buildSearchWhere`, `buildOrderBy` | `useDebouncedValue`, `useTableUrlState` |
+| PATCH payloads | `buildPatchData` | `omitEmptyStringEntries` |
+| Required filters | `requireDefined` | none |
+| Dates | `getDateRange`, `TIME_FILTERS`, `zonedDateTimeToUtc` | `formatDate`, date-range query builder |
+| Hashing | `hashData`, `compareData`, `hashToken` | none |
+| Booleans from strings | `parseBoolean` | `parseBoolean` |
+| Prisma errors | `isPrismaUniqueConstraintError`, `toUserConflictException` | none |
+| Redirect safety | none | `sanitizeRedirectPath` |
+| Class names | none | `cn` |
+
+## 6. TypeScript
+
+Must:
+- Keep `strict` on. Use `unknown` and narrow it instead of `any`.
+- Use `import type` for type-only imports.
+- Make `switch` statements over enums exhaustive with a `default` branch that assigns to `never`.
+- Give exported functions explicit return types.
+
+Never:
+- Use the non-null assertion `!`, unless a check the compiler can't see guarantees the value. Add a comment naming that check.
+- Use `as` to silence a type error. Fix the type instead.
+- Use `@ts-ignore`. Use `@ts-expect-error` with a reason if you have no other option.
+
+## 7. Tooling
+
+Must:
+- Leave every change passing `npm run lint`, `npm run typecheck` and Prettier in the app you touched.
+- Run `npm run lint:fix` and `npm run format` before calling a task done.
+
+Never:
+- Change ESLint, Prettier or `tsconfig` settings to make an error go away.
+- Add `eslint-disable` without a reason after `--` (`// eslint-disable-next-line rule-name -- reason`).
+- Use `console.log`. Use the Nest `Logger` on the backend. On the frontend, remove debug logging before finishing.
+
+## Review checklist
+
+- [ ] No em dashes or dash substitutes anywhere in the diff.
+- [ ] Every exported helper, hook, guard and decorator has JSDoc that adds information.
+- [ ] No comment restates code or talks to a reviewer. No commented-out code.
+- [ ] Domain values come from Prisma enums or `as const` objects. No raw string comparisons.
+- [ ] New files sit in the folders from `docs/PLAN.md`, with barrels updated.
+- [ ] No new helper duplicates an existing one.
+- [ ] No `any`, `@ts-ignore`, unexplained `!` or `console.log`.
+- [ ] Lint, typecheck and Prettier pass.
