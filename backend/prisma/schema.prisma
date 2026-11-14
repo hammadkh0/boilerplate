@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  SUPER_ADMIN
+
+  @@map("role")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("user_status")
+}
+
+enum AuditAction {
+  USER_SUSPENDED
+  USER_ACTIVATED
+  USER_SOFT_DELETED
+
+  @@map("audit_action")
+}
+
+model User {
+  id                          String     @id @default(uuid(7)) @db.Uuid
+  email                       String     @unique @db.VarChar(320)
+  passwordHash                String
+  fullName                    String     @db.VarChar(120)
+  role                        Role       @default(USER)
+  status                      UserStatus @default(ACTIVE)
+  emailVerifiedAt             DateTime?
+  avatarKey                   String?
+  refreshTokenHash            String?
+  tokenVersion                Int        @default(0)
+  emailVerificationTokenHash  String?    @unique
+  emailVerificationExpiresAt  DateTime?
+  passwordResetTokenHash      String?    @unique
+  passwordResetExpiresAt      DateTime?
+  lastLoginAt                 DateTime?
+  createdAt                   DateTime   @default(now())
+  updatedAt                   DateTime   @updatedAt
+  deletedAt                   DateTime?
+
+  auditLogs AuditLog[]
+
+  @@index([role, status, createdAt])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid(7)) @db.Uuid
+  actorId    String      @db.Uuid
+  action     AuditAction
+  entityType String      @db.VarChar(64)
+  entityId   String      @db.VarChar(64)
+  metadata   Json?
+  ip         String?     @db.VarChar(64)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt, id])
+  @@index([actorId, createdAt, id])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model HttpRequestLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  method     String   @db.VarChar(16)
+  path       String   @db.VarChar(512)
+  statusCode Int
+  durationMs Int
+  ip         String?  @db.VarChar(64)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("http_request_logs")
+}

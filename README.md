@@ -29,6 +29,20 @@ That installs Husky, lint-staged, secretlint and Prettier. Git has to be initial
 
 Before each commit, Git runs lint-staged. That formats the staged files, scans them with secretlint, and runs ESLint in `backend/` or `frontend/` once that app is installed. Before each push, Git runs `npm run audit:security`.
 
+## Backend
+
+From `backend/`, with Node 26:
+
+```powershell
+docker compose up -d
+Copy-Item .env.example .env
+npm install
+npx prisma migrate dev
+npm run dev
+```
+
+Replace the two JWT secrets in `.env` before the API is used anywhere except your machine. The health check is `http://localhost:3001/health`. Swagger is `http://localhost:3001/api/docs` when `SWAGGER_ENABLED=true`. Postgres is on port 5432 and Adminer is on port 8080.
+
 ## Docs
 
 - `docs/PLAN.md` is the build plan.
