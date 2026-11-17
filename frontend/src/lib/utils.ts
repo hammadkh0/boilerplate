@@ -5,6 +5,16 @@ export function omitEmptyStringEntries(map: Record<string, string>): Record<stri
   return Object.fromEntries(Object.entries(map).filter(([, value]) => value.trim().length > 0));
 }
 
+/** Returns one search param value. Repeated params and empty strings become null. */
+export function readSearchParam(value: string | string[] | undefined): string | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  if (!first) {
+    return null;
+  }
+  const trimmed = first.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 /** Allows only same-site relative paths, so a redirect cannot leave this site. */
 export function sanitizeRedirectPath(value: string | null | undefined): string | null {
   if (!value) {

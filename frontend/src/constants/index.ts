@@ -1,5 +1,8 @@
 export const ROUTES = {
   HOME: '/',
+  PRIVACY: '/privacy',
+  TERMS: '/terms',
+  THANK_YOU: '/thank-you',
   LOGIN: '/login',
   REGISTER: '/register',
   FORGOT_PASSWORD: '/forgot-password',
@@ -41,3 +44,11 @@ export const SORT_ORDER = {
 } as const;
 
 export const API_PREFIX = '/api/v1';
+
+/** Matches the backend email cooldown so the resend button does not hammer the API. */
+export const RESEND_COOLDOWN_MS = 60_000;
+
+export const PRIVATE_PAGE_ROBOTS = {
+  index: false,
+  follow: false,
+} as const;

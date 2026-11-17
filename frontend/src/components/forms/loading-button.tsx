@@ -5,18 +5,22 @@ import { Button } from '@/components/ui/button';
 
 type LoadingButtonProps = ComponentProps<typeof Button> & {
   pending?: boolean;
+  loading?: boolean;
 };
 
-/** A button that shows a spinner and ignores clicks while `pending` is true. */
+/** A button that shows a spinner beside its label and ignores clicks while a request is in flight. */
 export function LoadingButton({
   pending = false,
+  loading = false,
   disabled,
   children,
   ...props
 }: LoadingButtonProps) {
+  const isPending = pending || loading;
+
   return (
-    <Button disabled={pending || disabled} aria-busy={pending} {...props}>
-      {pending ? <Loader2 className="animate-spin" /> : null}
+    <Button disabled={isPending || disabled} aria-busy={isPending} {...props}>
+      {isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
       {children}
     </Button>
   );
