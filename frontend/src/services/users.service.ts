@@ -6,6 +6,7 @@ import type {
   Paginated,
   ServiceRequestOptions,
   UserProfile,
+  UserStatus,
 } from '@/types';
 
 export function getMe(options?: ServiceRequestOptions): Promise<UserProfile> {
@@ -20,6 +21,31 @@ export function updateMe(
 ): Promise<UserProfile> {
   return api
     .patch('/users/me', input, { signal: options?.signal })
+    .then((response) => unwrapEnvelope(response.data));
+}
+
+export function getUser(id: string, options?: ServiceRequestOptions): Promise<UserProfile> {
+  return api
+    .get(`/users/${id}`, { signal: options?.signal })
+    .then((response) => unwrapEnvelope(response.data));
+}
+
+export function updateUserStatus(
+  id: string,
+  status: UserStatus,
+  options?: ServiceRequestOptions,
+): Promise<AdminUserListItem> {
+  return api
+    .patch(`/users/${id}/status`, { status }, { signal: options?.signal })
+    .then((response) => unwrapEnvelope(response.data));
+}
+
+export function deleteUser(
+  id: string,
+  options?: ServiceRequestOptions,
+): Promise<{ message: string }> {
+  return api
+    .delete(`/users/${id}`, { signal: options?.signal })
     .then((response) => unwrapEnvelope(response.data));
 }
 

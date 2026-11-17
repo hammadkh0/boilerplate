@@ -12,10 +12,17 @@ import { FormErrorAlert } from '@/components/forms/form-error-alert';
 import { LoadingButton } from '@/components/forms/loading-button';
 import { PasswordField, TextField } from '@/components/forms/text-field';
 import { AUTH_COPY } from '@/constants/copy/auth';
-import { ROUTES } from '@/constants';
+import { ADMIN_PORTAL_ROLES, ROUTES } from '@/constants';
+import type { UserRole } from '@/types';
 import { applyMappedErrors, mapApiFieldErrors } from '@/lib/map-api-field-errors';
 import { loginSchema, type LoginValues } from '@/schemas/auth';
 import { login } from '@/services/auth.service';
+
+const adminRoles: readonly UserRole[] = ADMIN_PORTAL_ROLES;
+
+function landingPath(role: UserRole): string {
+  return adminRoles.includes(role) ? ROUTES.ADMIN_DASHBOARD : ROUTES.ACCOUNT;
+}
 
 export function LoginForm({ nextPath }: { nextPath: string | null }) {
   const router = useRouter();
@@ -26,9 +33,9 @@ export function LoginForm({ nextPath }: { nextPath: string | null }) {
   });
   const mutation = useMutation({
     mutationFn: (values: LoginValues) => login(values),
-    onSuccess: () => {
+    onSuccess: (user) => {
       toast.success(AUTH_COPY.LOGIN_SUCCESS);
-      router.push(nextPath ?? ROUTES.ACCOUNT);
+      router.push(nextPath ?? landingPath(user.role));
       router.refresh();
     },
     onError: (error) => {

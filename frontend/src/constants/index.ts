@@ -43,6 +43,26 @@ export const SORT_ORDER = {
   DESC: 'desc',
 } as const;
 
+export const FILTER_ALL = 'all';
+
+export const USER_SORT_FIELDS = {
+  FULL_NAME: 'fullName',
+  EMAIL: 'email',
+  ROLE: 'role',
+  STATUS: 'status',
+  CREATED_AT: 'createdAt',
+} as const;
+
+export const AUDIT_ACTION = {
+  USER_SUSPENDED: 'USER_SUSPENDED',
+  USER_ACTIVATED: 'USER_ACTIVATED',
+  USER_SOFT_DELETED: 'USER_SOFT_DELETED',
+} as const;
+
+export const AUDIT_ENTITY = {
+  USER: 'User',
+} as const;
+
 export const API_PREFIX = '/api/v1';
 
 /** Matches the backend email cooldown so the resend button does not hammer the API. */
