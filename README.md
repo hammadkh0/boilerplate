@@ -46,6 +46,18 @@ npm run seed
 
 Replace the two JWT secrets in `.env` before the API is used anywhere except your machine. The health check is `http://localhost:3001/health`. Swagger is `http://localhost:3001/api/docs` when `SWAGGER_ENABLED=true`. Postgres is on port 5432 and Adminer is on port 8080.
 
+## Frontend
+
+From `frontend/`, with Node 26:
+
+```powershell
+Copy-Item .env.example .env.local
+npm install
+npm run dev
+```
+
+The app runs at `http://localhost:3000` and rewrites `/api/v1` to `BACKEND_URL` (the API on port 3001). `src/proxy.ts` keeps signed-out visitors out of `/admin` and `/account`.
+
 ## Docs
 
 - `docs/PLAN.md` is the build plan.

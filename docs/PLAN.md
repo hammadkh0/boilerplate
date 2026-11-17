@@ -1,6 +1,6 @@
 # Boilerplate plan
 
-Status: phase 3 is done. Phase 4 has not started.
+Status: phase 5 is done. Phase 6 has not started.
 
 This boilerplate is the starting point for new client projects. It holds a NestJS backend and a Next.js frontend in one repo. Its Cursor rules tell AI agents how to write code here, so the code they produce stays consistent, secure and fast.
 
@@ -574,4 +574,4 @@ Each phase ends with a review before the next one starts.
 
 ## 11. Open items
 
-Phases 0 through 3 are done. Phase 4 has not started.
+Phases 0 through 5 are done. Phase 6 has not started.

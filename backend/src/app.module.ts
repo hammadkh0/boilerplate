@@ -5,10 +5,14 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AppConfigModule } from './modules/config/config.module';
 import { AppConfigService } from './modules/config/app-config.service';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
+import { HttpRequestLogModule } from './modules/http-request-log/http-request-log.module';
+import { UsersModule } from './modules/users/users.module';
 import { HttpExceptionFilter } from './modules/shared/filters';
 import { JwtAuthGuard, OriginGuard, RolesGuard } from './modules/shared/guards';
 import { ResponseInterceptor } from './modules/shared/interceptors';
@@ -40,6 +44,10 @@ import { buildPinoRedactPaths } from './modules/shared/utils';
     }),
     SharedModule,
     AuthModule,
+    UsersModule,
+    DashboardModule,
+    AuditLogModule,
+    HttpRequestLogModule,
     HealthModule,
   ],
   providers: [
