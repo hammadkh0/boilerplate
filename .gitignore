@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 .next/
+e2e/playwright-report/
+e2e/test-results/
+e2e/blob-report/
 out/
 coverage/
 *.tsbuildinfo

@@ -35,6 +35,12 @@ export const ENVIRONMENTS = {
   TEST: 'test',
 } as const;
 
+/** `smtp` targets a local inbox such as Mailpit. The env schema refuses it in production. */
+export const EMAIL_TRANSPORT = {
+  RESEND: 'resend',
+  SMTP: 'smtp',
+} as const;
+
 /** bcrypt only reads the first 72 bytes, so passwords stop at 72 characters. */
 export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
 

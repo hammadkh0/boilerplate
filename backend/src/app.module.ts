@@ -39,8 +39,14 @@ import { buildPinoRedactPaths } from './modules/shared/utils';
         },
       }),
     }),
-    ThrottlerModule.forRoot({
-      throttlers: [{ name: 'default', ttl: 60_000, limit: 100 }],
+    ThrottlerModule.forRootAsync({
+      imports: [AppConfigModule],
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => ({
+        throttlers: [{ name: 'default', ttl: 60_000, limit: 100 }],
+        // The browser suite signs in many users from one IP. Production refuses this switch.
+        skipIf: () => !config.rateLimitEnabled,
+      }),
     }),
     SharedModule,
     AuthModule,

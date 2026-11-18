@@ -8,11 +8,11 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: boilerplate
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - boilerplate_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d boilerplate"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d boilerplate']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,10 +22,19 @@ services:
     container_name: boilerplate-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - '8080:8080'
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Local inbox for EMAIL_TRANSPORT=smtp. SMTP on 1025, web UI and API on 8025.
+  mailpit:
+    image: axllent/mailpit:v1
+    container_name: boilerplate-mailpit
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
 
 volumes:
   boilerplate_postgres:

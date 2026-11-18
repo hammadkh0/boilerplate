@@ -1,0 +1,79 @@
+---
+description: Playwright browser tests in e2e/. Journeys, selectors, test data, waiting and the Mailpit inbox.
+globs: e2e/**
+alwaysApply: false
+---
+
+# End-to-end tests
+
+`e2e/` holds Playwright tests that drive a real browser against the real frontend and backend. `docs/PLAN.md` section 8.1 explains how a run boots both apps, resets the `boilerplate_e2e` database and catches email in Mailpit.
+
+## 1. What gets a browser test
+
+A browser test is slow and touches every layer, so it earns its place only for a journey a user would notice breaking.
+
+Must:
+- Cover journeys that cross the frontend, the Next rewrite, cookies and the backend: sign up, verification, sign in, password reset, sign out, route protection and admin actions with a visible effect.
+- Cover the happy path plus the one failure a user sees most, such as a wrong password.
+- Put validation edge cases, permission matrices and error mapping in the backend Jest tests (`backend/test/`).
+
+Never:
+- Write a browser test for something a unit or API test can prove.
+- Assert on styling, pixel positions or animation timing.
+
+## 2. Selectors
+
+Must:
+- Find elements the way a user does: `getByRole`, `getByLabel`, then `getByText`. Pass `{ exact: true }` when one label is a prefix of another, such as "Password" and "Confirm password".
+- Take labels and messages from the frontend copy constants (`@/constants/copy/*`) and paths from `ROUTES`, so changing copy doesn't break tests silently. Backend messages come from the module's `constants/`.
+- Scope lookups to a region when text repeats, for example `page.getByRole('row', { name: email })`.
+
+Never:
+- Select by CSS class, DOM structure or `nth-child`.
+- Add `data-testid` while a role or label can find the element. When nothing else works, name the test ID from a constant.
+- Hardcode UI text or a route path in a spec.
+
+## 3. Test data
+
+Must:
+- Create a fresh user in each test with `uniqueEmail()`, so tests run in parallel without sharing state.
+- Build setup that isn't under test through the API helpers in `support/`, such as `registerUser` and `signIn`. Drive the UI only for the journey the test checks.
+- Use the seeded admin from `support/env.ts` for admin journeys.
+
+Never:
+- Depend on another test's data or on test order.
+- Point the suite at the development database or any shared environment.
+- Commit real credentials. The e2e values in `support/env.ts` are local placeholders.
+
+## 4. Waiting
+
+Must:
+- Rely on auto-waiting locators and web-first assertions (`await expect(locator).toBeVisible()`, `await expect(page).toHaveURL(...)`).
+- Poll for async results outside the page, such as email, with `expect.poll` or the `latestEmail` helper.
+
+Never:
+- Use `page.waitForTimeout` or a `sleep`.
+- Read a value once and assert on it with a plain `expect` when the page may still be updating.
+
+## 5. Email
+
+Must:
+- Read verification and reset links through `support/mailpit.ts`, filtered by recipient.
+- Open the link from the email with `page.goto`, exactly as the user would.
+
+Never:
+- Read tokens from the database or add a backend endpoint that returns them.
+
+## 6. Running
+
+- `npm run test` in `e2e/` runs the suite headless. Docker must be running for Postgres and Mailpit.
+- `npm run test:ui` opens UI mode. `npx playwright show-trace <file>` opens the trace of a failed test.
+- Keep each test independent and under about 30 seconds.
+
+## Review checklist
+
+- [ ] The journey crosses the browser and backend, and an API test couldn't cover it.
+- [ ] Selectors use role, label or text from copy constants. No CSS selectors, no hardcoded copy or paths.
+- [ ] Each test creates its own user, and setup goes through the API helpers.
+- [ ] No `waitForTimeout` or sleeps.
+- [ ] Email links come from Mailpit, never from the database.

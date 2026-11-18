@@ -46,6 +46,8 @@ npm run seed
 
 Replace the two JWT secrets in `.env` before the API is used anywhere except your machine. The health check is `http://localhost:3001/health`. Swagger is `http://localhost:3001/api/docs` when `SWAGGER_ENABLED=true`. Postgres is on port 5432 and Adminer is on port 8080.
 
+`docker compose up -d` also starts Mailpit. Its inbox is `http://localhost:8025`. Set `EMAIL_TRANSPORT=smtp` in `.env` to deliver mail there instead of through Resend.
+
 ## Frontend
 
 From `frontend/`, with Node 26:
@@ -57,6 +59,22 @@ npm run dev
 ```
 
 The app runs at `http://localhost:3000` and rewrites `/api/v1` to `BACKEND_URL` (the API on port 3001). `src/proxy.ts` keeps signed-out visitors out of `/admin` and `/account`.
+
+## End-to-end tests
+
+From the repo root, with Docker already running the backend compose file:
+
+```powershell
+cd backend
+docker compose up -d
+cd ..\e2e
+npm install
+npx playwright install chromium
+npm run typecheck
+npm run test
+```
+
+Playwright builds the frontend and the backend, resets the `boilerplate_e2e` database, and drives a browser on port 4000. The dev servers on ports 3000 and 3001 can stay running. A failed test keeps a trace in `e2e/test-results/`. Open it with `npx playwright show-trace` from `e2e/`.
 
 ## Docs
 

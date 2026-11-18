@@ -42,7 +42,10 @@ export async function proxy(request: NextRequest) {
   const { BACKEND_URL } = getServerEnv();
   const refreshResponse = await fetch(`${BACKEND_URL}${API_PREFIX}/auth/refresh`, {
     method: 'POST',
-    headers: { cookie: request.headers.get('cookie') ?? '' },
+    headers: {
+      cookie: request.headers.get('cookie') ?? '',
+      origin: request.nextUrl.origin,
+    },
   });
 
   if (!refreshResponse.ok) {

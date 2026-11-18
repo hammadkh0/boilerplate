@@ -1,59 +1,60 @@
 # Boilerplate plan
 
-Status: phases 6 through 8 are done. Phase 9 has not started.
+Status: phases 0 through 9 are done. Phase 10 has not started.
 
 This boilerplate is the starting point for new client projects. It holds a NestJS backend and a Next.js frontend in one repo. Its Cursor rules tell AI agents how to write code here, so the code they produce stays consistent, secure and fast.
 
 It borrows from three reference repos.
 
-| Repo | What we take from it |
-|---|---|
-| Driving-Test | The code layout and file structure, which is the best of the three. Also the admin portal look, the uploads service, the auth refresh flow, the soft-delete extension and the frontend services layer. |
-| HumanityHub-Backend | The helpers in `common/`, which are the best of the three. Also Prisma 7 on Postgres with `@prisma/adapter-pg` and the global guards. |
-| Fright-Marketplace | The table toolbar and the `useDebouncedValue` and `useTablePage` hooks. Also the Prettier config, the Prisma error helpers and the Mongo `unsetOrNull` helper. |
+| Repo                | What we take from it                                                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Driving-Test        | The code layout and file structure, which is the best of the three. Also the admin portal look, the uploads service, the auth refresh flow, the soft-delete extension and the frontend services layer. |
+| HumanityHub-Backend | The helpers in `common/`, which are the best of the three. Also Prisma 7 on Postgres with `@prisma/adapter-pg` and the global guards.                                                                  |
+| Fright-Marketplace  | The table toolbar and the `useDebouncedValue` and `useTablePage` hooks. Also the Prettier config, the Prisma error helpers and the Mongo `unsetOrNull` helper.                                         |
 
 ---
 
 ## 1. Decisions
 
-| # | Topic | Decision |
-|---|---|---|
-| 1 | Null vs undefined | A Postgres rule plus helpers that handle Prisma's null vs undefined behavior. The Mongo `unsetOrNull` helper stays as an optional file, and the rule gets a short Mongo appendix. |
-| 2 | Repo layout | One git repo with `backend/` and `frontend/` folders. Each folder is its own npm project. One root `.cursor/rules/` folder uses globs to scope each rule. |
-| 3 | Auth tokens | Both the access token and the refresh token live in httpOnly cookies. The frontend calls the backend through a Next.js rewrite, so the browser treats the cookies as first-party. Refresh tokens rotate, and a `tokenVersion` counter revokes sessions. |
-| 4 | Auth features | Register, login, logout, forgot and reset password, email verification, Resend with EJS templates, and a profile page with change password. No Google OAuth and no two-factor auth. |
-| 5 | Roles | The Prisma `Role` enum starts with `USER` and `SUPER_ADMIN`. Global guards apply `@Public()` and `@Roles()`. Each admin handler lists its allowed roles with `@Roles(Role.SUPER_ADMIN)`. The frontend admin layout checks an `ADMIN_PORTAL_ROLES` list for portal access. Adding `ADMIN` later means one enum value, one edit to that list, and adding the role to the handlers it should reach. A `UserStatus` enum holds `ACTIVE` and `SUSPENDED`. No permissions table. |
-| 6 | Admin scope | A users table with search, filters, sorting and page size, all stored in the URL. Row actions for details, suspend or activate, and soft delete. KPI cards on the dashboard. An audit log of admin actions. No chart, no create-user flow and no CSV export. The table copies the styling of the Driving-Test admin users page. |
-| 7 | shadcn base | Radix, which composes components with `asChild`. |
-| 8 | Admin layout | One admin portal shell. A left sidebar holds the main tabs. A top navbar holds the sidebar toggle, the theme toggle and the user menu. Section 5 has the full spec. |
-| 9 | User landing | Regular users land on `/account`, which has the profile and change-password forms and uses the marketing navbar. Admins land on `/admin/dashboard` and also get `/admin/profile`. |
-| 10 | S3 | The backend gets an `uploads` module ported from Driving-Test. An env flag turns it on. The frontend gets no upload UI yet. We use real AWS S3, with no MinIO. The backend avatar endpoint exists, and the UI for it comes later. |
-| 11 | i18n | No i18n. Each feature keeps its user-facing copy in copy constants, so adding `next-intl` later means swapping those constants for message files. |
-| 12 | Quality gates | Husky runs lint-staged on commit, which runs Prettier, ESLint and secretlint. A pre-push hook runs `npm audit --audit-level=high`. The backend gets Jest unit tests for helpers and an end-to-end auth test. No CI workflow, no frontend tests and no em-dash scan. |
-| 13 | Deployment | `backend/docker-compose.yml` runs Postgres 17 for local development. It lives in the backend folder because only the backend uses it. The backend gets a multi-stage Dockerfile that runs as a non-root user and applies `prisma migrate deploy` on start. The backend also gets a `/health` endpoint. The frontend targets Vercel, and the README documents `output: 'standalone'` for self-hosting. |
-| 14 | Logging | `nestjs-pino` writes structured logs to stdout, with redaction and request IDs. We port the DB request-log module but leave it off by default, and it gets a retention cron. The audit log is separate and always on. |
-| 15 | Rules | Eight focused rule files. Each has a Must and Never list and a review checklist. `docs/RULES.md` maps your requirements to the rules. |
-| 16 | React Compiler | On. The `react-hooks` compiler rules, including `set-state-in-effect`, run as errors. Components skip manual memoization by default. |
-| 17 | Forms | React Hook Form, Zod and a React Query `useMutation`. Field errors render with shadcn `Field` components. When the backend returns a 400 with field details, `setError` maps them onto the form. Every submit uses a shared `LoadingButton`. |
-| 18 | Landing | A hero with the CTA above the fold, a sticky CTA bar on mobile, a features grid, a "how it works" section, an FAQ with FAQ structured data, and a footer linking to Privacy and Terms. `/thank-you` is the page users see after registering, telling them to check their inbox. |
+| #   | Topic             | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Null vs undefined | A Postgres rule plus helpers that handle Prisma's null vs undefined behavior. The Mongo `unsetOrNull` helper stays as an optional file, and the rule gets a short Mongo appendix.                                                                                                                                                                                                                                                                                          |
+| 2   | Repo layout       | One git repo with `backend/` and `frontend/` folders. Each folder is its own npm project. One root `.cursor/rules/` folder uses globs to scope each rule.                                                                                                                                                                                                                                                                                                                  |
+| 3   | Auth tokens       | Both the access token and the refresh token live in httpOnly cookies. The frontend calls the backend through a Next.js rewrite, so the browser treats the cookies as first-party. Refresh tokens rotate, and a `tokenVersion` counter revokes sessions.                                                                                                                                                                                                                    |
+| 4   | Auth features     | Register, login, logout, forgot and reset password, email verification, Resend with EJS templates, and a profile page with change password. No Google OAuth and no two-factor auth.                                                                                                                                                                                                                                                                                        |
+| 5   | Roles             | The Prisma `Role` enum starts with `USER` and `SUPER_ADMIN`. Global guards apply `@Public()` and `@Roles()`. Each admin handler lists its allowed roles with `@Roles(Role.SUPER_ADMIN)`. The frontend admin layout checks an `ADMIN_PORTAL_ROLES` list for portal access. Adding `ADMIN` later means one enum value, one edit to that list, and adding the role to the handlers it should reach. A `UserStatus` enum holds `ACTIVE` and `SUSPENDED`. No permissions table. |
+| 6   | Admin scope       | A users table with search, filters, sorting and page size, all stored in the URL. Row actions for details, suspend or activate, and soft delete. KPI cards on the dashboard. An audit log of admin actions. No chart, no create-user flow and no CSV export. The table copies the styling of the Driving-Test admin users page.                                                                                                                                            |
+| 7   | shadcn base       | Radix, which composes components with `asChild`.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 8   | Admin layout      | One admin portal shell. A left sidebar holds the main tabs. A top navbar holds the sidebar toggle, the theme toggle and the user menu. Section 5 has the full spec.                                                                                                                                                                                                                                                                                                        |
+| 9   | User landing      | Regular users land on `/account`, which has the profile and change-password forms and uses the marketing navbar. Admins land on `/admin/dashboard` and also get `/admin/profile`.                                                                                                                                                                                                                                                                                          |
+| 10  | S3                | The backend gets an `uploads` module ported from Driving-Test. An env flag turns it on. The frontend gets no upload UI yet. We use real AWS S3, with no MinIO. The backend avatar endpoint exists, and the UI for it comes later.                                                                                                                                                                                                                                          |
+| 11  | i18n              | No i18n. Each feature keeps its user-facing copy in copy constants, so adding `next-intl` later means swapping those constants for message files.                                                                                                                                                                                                                                                                                                                          |
+| 12  | Quality gates     | Husky runs lint-staged on commit, which runs Prettier, ESLint and secretlint. A pre-push hook runs `npm audit --audit-level=high`. The backend gets Jest unit tests for helpers and API tests for auth and admin. Browser end-to-end tests are covered in decision 19. No CI workflow, no frontend unit tests and no em-dash scan.                                                                                                                                         |
+| 13  | Deployment        | `backend/docker-compose.yml` runs Postgres 17 for local development. It lives in the backend folder because only the backend uses it. The backend gets a multi-stage Dockerfile that runs as a non-root user and applies `prisma migrate deploy` on start. The backend also gets a `/health` endpoint. The frontend targets Vercel, and the README documents `output: 'standalone'` for self-hosting.                                                                      |
+| 14  | Logging           | `nestjs-pino` writes structured logs to stdout, with redaction and request IDs. We port the DB request-log module but leave it off by default, and it gets a retention cron. The audit log is separate and always on.                                                                                                                                                                                                                                                      |
+| 15  | Rules             | Nine focused rule files. Each has a Must and Never list and a review checklist. `docs/RULES.md` maps your requirements to the rules.                                                                                                                                                                                                                                                                                                                                       |
+| 16  | React Compiler    | On. The `react-hooks` compiler rules, including `set-state-in-effect`, run as errors. Components skip manual memoization by default.                                                                                                                                                                                                                                                                                                                                       |
+| 17  | Forms             | React Hook Form, Zod and a React Query `useMutation`. Field errors render with shadcn `Field` components. When the backend returns a 400 with field details, `setError` maps them onto the form. Every submit uses a shared `LoadingButton`.                                                                                                                                                                                                                               |
+| 18  | Landing           | A hero with the CTA above the fold, a sticky CTA bar on mobile, a features grid, a "how it works" section, an FAQ with FAQ structured data, and a footer linking to Privacy and Terms. `/thank-you` is the page users see after registering, telling them to check their inbox.                                                                                                                                                                                            |
+| 19  | End-to-end tests  | Playwright in a root `e2e/` npm project drives a real browser against a production build of the frontend and the real backend. Mailpit, a local SMTP inbox, catches the verification and reset emails, so tests click the same link a user would. Tests run on their own `boilerplate_e2e` database, reset before each run. They cover a few critical journeys, and the Jest API tests cover the edge cases. Section 8.1 has the setup.                                    |
 
 ### Defaults I chose
 
 Veto any of these during review.
 
-| Topic | Default |
-|---|---|
-| IDs | UUIDs, stored as Postgres `uuid` columns with `@id @default(uuid(7)) @db.Uuid`. Version 7 is a standard UUID that also sorts by creation time, which keeps indexes compact. Sequential IDs let attackers guess other records. |
-| Soft delete | The Driving-Test implementation, which Fright copied, adapted for Postgres. Section 3.9 explains the choice. Fright's tombstone helper frees a deleted user's email so it can register again. |
-| API | Every route sits under `/api/v1`. Swagger lives at `/api/docs` and is off in production unless `SWAGGER_ENABLED=true`. |
-| Envelope | Responses look like `{ success, data }`. Offset lists return `{ items, meta: { page, limit, total, totalPages } }`. Cursor lists return `{ items, meta: { nextCursor, hasMore, limit } }`. `limit` defaults to 20 and caps at 100. Section 3.5 says which strategy each list uses. |
-| Env | A Zod schema validates env at boot, and the app refuses to start if a value is missing. Secrets have no fallback values. The frontend validates its public env the same way. |
-| Sessions | No sessions table. Both tokens are JWTs, and `User` stores the refresh token hash and `tokenVersion`, as in Driving-Test. Section 3.4 has the flow. |
-| HTTP client | Axios and `fetch` both, split the way Driving-Test splits them. Browser code uses an axios instance with an interceptor that queues requests during a 401 refresh. Server components use a `server-only` `fetch` client that forwards cookies and supports Next caching. Streaming responses also use `fetch`, because axios can't stream in the browser. Section 4.3 has the details. |
-| Branding | Placeholder brand "Acme" with a short tagline in `site.config.ts`. shadcn's `neutral` base color with a deep green primary, close to the Driving-Test look, defined as CSS variables in `globals.css` for both light and dark mode. |
-| Node | The latest LTS release at scaffold time, which is Node 26 as of November 2026. `.nvmrc` and `engines` pin it. |
-| Versions | The latest stable release of every package at scaffold time. That means Nest 11, Prisma 7 or later, Next 16, React 19, Tailwind 4 and Zod 4. |
-| Next file conventions | `proxy.ts`, which is the Next 16 name for middleware. |
+| Topic                 | Default                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IDs                   | UUIDs, stored as Postgres `uuid` columns with `@id @default(uuid(7)) @db.Uuid`. Version 7 is a standard UUID that also sorts by creation time, which keeps indexes compact. Sequential IDs let attackers guess other records.                                                                                                                                                          |
+| Soft delete           | The Driving-Test implementation, which Fright copied, adapted for Postgres. Section 3.9 explains the choice. Fright's tombstone helper frees a deleted user's email so it can register again.                                                                                                                                                                                          |
+| API                   | Every route sits under `/api/v1`. Swagger lives at `/api/docs` and is off in production unless `SWAGGER_ENABLED=true`.                                                                                                                                                                                                                                                                 |
+| Envelope              | Responses look like `{ success, data }`. Offset lists return `{ items, meta: { page, limit, total, totalPages } }`. Cursor lists return `{ items, meta: { nextCursor, hasMore, limit } }`. `limit` defaults to 20 and caps at 100. Section 3.5 says which strategy each list uses.                                                                                                     |
+| Env                   | A Zod schema validates env at boot, and the app refuses to start if a value is missing. Secrets have no fallback values. The frontend validates its public env the same way.                                                                                                                                                                                                           |
+| Sessions              | No sessions table. Both tokens are JWTs, and `User` stores the refresh token hash and `tokenVersion`, as in Driving-Test. Section 3.4 has the flow.                                                                                                                                                                                                                                    |
+| HTTP client           | Axios and `fetch` both, split the way Driving-Test splits them. Browser code uses an axios instance with an interceptor that queues requests during a 401 refresh. Server components use a `server-only` `fetch` client that forwards cookies and supports Next caching. Streaming responses also use `fetch`, because axios can't stream in the browser. Section 4.3 has the details. |
+| Branding              | Placeholder brand "Acme" with a short tagline in `site.config.ts`. shadcn's `neutral` base color with a deep green primary, close to the Driving-Test look, defined as CSS variables in `globals.css` for both light and dark mode.                                                                                                                                                    |
+| Node                  | The latest LTS release at scaffold time, which is Node 26 as of November 2026. `.nvmrc` and `engines` pin it.                                                                                                                                                                                                                                                                          |
+| Versions              | The latest stable release of every package at scaffold time. That means Nest 11, Prisma 7 or later, Next 16, React 19, Tailwind 4 and Zod 4.                                                                                                                                                                                                                                           |
+| Next file conventions | `proxy.ts`, which is the Next 16 name for middleware.                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -61,7 +62,7 @@ Veto any of these during review.
 
 ```
 Boilerplate/
-  .cursor/rules/            8 rule files
+  .cursor/rules/            9 rule files
   docs/RULES.md             maps each requirement to the rule that covers it
   .husky/                   pre-commit runs lint-staged, pre-push runs the audit
   docs/PLAN.md              this file
@@ -72,9 +73,10 @@ Boilerplate/
   README.md                 setup, scripts, and how to start a new project from this repo
   backend/
   frontend/
+  e2e/                      Playwright browser tests, its own npm project
 ```
 
-Phase 0 deleted the stale rules copied from other repos: `module-folder-structure.mdc`, `no-hardcoded-domain-strings.mdc` and `mongo-unset-null-queries.mdc`. The Mongo content moved into the appendix of `backend-database.mdc`. The two `.code-workspace` files open the reference repos, so they stay until the Phase 9 cleanup.
+Phase 0 deleted the stale rules copied from other repos: `module-folder-structure.mdc`, `no-hardcoded-domain-strings.mdc` and `mongo-unset-null-queries.mdc`. The Mongo content moved into the appendix of `backend-database.mdc`. The two `.code-workspace` files open the reference repos, so they stay until the Phase 10 cleanup.
 
 ---
 
@@ -84,18 +86,18 @@ Phase 0 deleted the stale rules copied from other repos: `module-folder-structur
 
 The backend runs NestJS 11 and Prisma 7 with `@prisma/adapter-pg` and `prisma.config.ts`, on Postgres 17.
 
-| Concern | Packages |
-|---|---|
-| Config | `@nestjs/config` with a Zod env schema |
-| Auth | `@nestjs/jwt`, `passport-jwt`, `bcrypt` |
-| Validation | `class-validator`, `class-transformer` |
-| HTTP hardening | `helmet`, `cookie-parser`, `@nestjs/throttler` |
-| Docs and health | `@nestjs/swagger`, `@nestjs/terminus` |
-| Logging and jobs | `nestjs-pino`, `@nestjs/schedule` |
-| Files | `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `sharp`, `file-type` for magic-byte checks |
-| Email | `resend`, `ejs` |
-| Utilities | `uuidv7`, `date-fns`, `date-fns-tz`, `libphonenumber-js`, `ua-parser-js` |
-| Dev | Jest, Supertest, ESLint flat config with type-checked `typescript-eslint`, Prettier |
+| Concern          | Packages                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| Config           | `@nestjs/config` with a Zod env schema                                                            |
+| Auth             | `@nestjs/jwt`, `passport-jwt`, `bcrypt`                                                           |
+| Validation       | `class-validator`, `class-transformer`                                                            |
+| HTTP hardening   | `helmet`, `cookie-parser`, `@nestjs/throttler`                                                    |
+| Docs and health  | `@nestjs/swagger`, `@nestjs/terminus`                                                             |
+| Logging and jobs | `nestjs-pino`, `@nestjs/schedule`                                                                 |
+| Files            | `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `sharp`, `file-type` for magic-byte checks |
+| Email            | `resend`, `ejs`, and `nodemailer` for the local SMTP transport                                    |
+| Utilities        | `uuidv7`, `date-fns`, `date-fns-tz`, `libphonenumber-js`, `ua-parser-js`                          |
+| Dev              | Jest, Supertest, ESLint flat config with type-checked `typescript-eslint`, Prettier               |
 
 ### 3.2 Folder structure
 
@@ -139,12 +141,12 @@ backend/
       dashboard/             KPI endpoint built on single count and groupBy queries
       audit-log/             service that admin actions call, plus an admin list endpoint
       uploads/               UploadsService for S3, turned on by S3_ENABLED
-      emails/                EmailService on Resend, EJS templates/, helpers
+      emails/                EmailService on Resend or local SMTP, EJS templates/, helpers
       health/                /health with a database check
       http-request-log/      optional, off by default, with a retention cron
   test/
-    auth.e2e-spec.ts
-  docker-compose.yml         Postgres 17 and Adminer for local development
+    auth.e2e-spec.ts  admin.e2e-spec.ts
+  docker-compose.yml         Postgres 17, Adminer and Mailpit for local development
   Dockerfile
   .env.example
   eslint.config.mjs
@@ -155,11 +157,11 @@ backend/
 
 These are the starting models.
 
-| Model | Key fields | Indexes |
-|---|---|---|
-| `User` | `id`, `email` (stored lowercase, unique), `passwordHash`, `fullName`, `role`, `status`, `emailVerifiedAt?`, `avatarKey?`, `refreshTokenHash?`, `tokenVersion`, `emailVerificationTokenHash?`, `emailVerificationExpiresAt?`, `passwordResetTokenHash?`, `passwordResetExpiresAt?`, `lastLoginAt?`, `createdAt`, `updatedAt`, `deletedAt?` | `(role, status, createdAt)`, `(createdAt)`, unique `(emailVerificationTokenHash)`, unique `(passwordResetTokenHash)` |
-| `AuditLog` | `id`, `actorId`, `action`, `entityType`, `entityId`, `metadata Json?`, `ip?`, `createdAt` | `(createdAt, id)` for cursor paging, `(actorId, createdAt, id)`, `(entityType, entityId)` |
-| `HttpRequestLog` | Exists only when the optional module is on | `(createdAt)` |
+| Model            | Key fields                                                                                                                                                                                                                                                                                                                                | Indexes                                                                                                              |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `User`           | `id`, `email` (stored lowercase, unique), `passwordHash`, `fullName`, `role`, `status`, `emailVerifiedAt?`, `avatarKey?`, `refreshTokenHash?`, `tokenVersion`, `emailVerificationTokenHash?`, `emailVerificationExpiresAt?`, `passwordResetTokenHash?`, `passwordResetExpiresAt?`, `lastLoginAt?`, `createdAt`, `updatedAt`, `deletedAt?` | `(role, status, createdAt)`, `(createdAt)`, unique `(emailVerificationTokenHash)`, unique `(passwordResetTokenHash)` |
+| `AuditLog`       | `id`, `actorId`, `action`, `entityType`, `entityId`, `metadata Json?`, `ip?`, `createdAt`                                                                                                                                                                                                                                                 | `(createdAt, id)` for cursor paging, `(actorId, createdAt, id)`, `(entityType, entityId)`                            |
+| `HttpRequestLog` | Exists only when the optional module is on                                                                                                                                                                                                                                                                                                | `(createdAt)`                                                                                                        |
 
 The enums are `Role`, `UserStatus` and `AuditAction`. Verification and reset tokens live on `User`, as in all three reference repos, so there is no separate token table.
 
@@ -167,10 +169,10 @@ The enums are `Role`, `UserStatus` and `AuditAction`. Verification and reset tok
 
 Login verifies the password with bcrypt and checks `status` and `deletedAt`. It then signs two JWTs with separate secrets, stores the SHA-256 hash of the refresh token on `User`, and sets two cookies.
 
-| Cookie | Contents | Attributes |
-|---|---|---|
-| `access_token` | A JWT with `sub`, `role` and `tv` (token version) that expires in 15 minutes | `HttpOnly; Secure; SameSite=Lax; Path=/` |
-| `refresh_token` | A JWT with `sub` and `tv` that expires in 30 days | `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` |
+| Cookie          | Contents                                                                     | Attributes                                          |
+| --------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
+| `access_token`  | A JWT with `sub`, `role` and `tv` (token version) that expires in 15 minutes | `HttpOnly; Secure; SameSite=Lax; Path=/`            |
+| `refresh_token` | A JWT with `sub` and `tv` that expires in 30 days                            | `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` |
 
 The rest of the flow works like this.
 
@@ -189,10 +191,10 @@ The rest of the flow works like this.
 
 List endpoints use one of two pagination strategies. `backend-database.mdc` section 6 has the full rules.
 
-| Strategy | Used for | Query DTO | Response `meta` |
-|---|---|---|---|
-| Offset | Tables in the low thousands of rows where users jump to a page, such as Users | `PaginationQueryDto` with `page`, `limit`, `search`, `sortBy`, `sortOrder` | `{ page, limit, total, totalPages }` |
-| Cursor | Large or append-only lists, such as the audit log | `CursorPaginationQueryDto` with `cursor`, `limit`, `search`, `sortOrder` | `{ nextCursor, hasMore, limit }` |
+| Strategy | Used for                                                                      | Query DTO                                                                  | Response `meta`                      |
+| -------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------ |
+| Offset   | Tables in the low thousands of rows where users jump to a page, such as Users | `PaginationQueryDto` with `page`, `limit`, `search`, `sortBy`, `sortOrder` | `{ page, limit, total, totalPages }` |
+| Cursor   | Large or append-only lists, such as the audit log                             | `CursorPaginationQueryDto` with `cursor`, `limit`, `search`, `sortOrder`   | `{ nextCursor, hasMore, limit }`     |
 
 Offset endpoints follow these steps.
 
@@ -212,59 +214,59 @@ We copy every helper from Driving-Test and HumanityHub, generalize the domain-sp
 
 **From Driving-Test `shared/utils`**
 
-| Helper | Destination | Change |
-|---|---|---|
-| Regex and type constants for time, documents, images, passwords, slugs, media, spreadsheets, UUIDs and email | `constants/` | Drop the ObjectId regex. Make the country and locale lists generic. |
-| `sleep` | `utils/function.utils.ts` | None |
-| Date helpers for strings, ranges, timezone keys, UTC boundaries, `zonedDateTimeToUtc`, calendar bounds and validation | `utils/date.utils.ts` | Merge in HumanityHub's `getDateRange` and `TIME_FILTERS`. |
-| `hashData`, `compareData`, phone normalizing, OTP, `stringify`, random strings, client IP, user agent parsing, `percentChange` | `utils/data.utils.ts` | Drop ObjectId generation. Phone normalizing uses libphonenumber with a default region read from env. |
-| `isObject`, `cloneDeep`, `assign`, `omitNullFields`, `mergeObjectMaps` | `utils/object.utils.ts` | Document `omitNullFields` as Mongo-only. |
-| `chunk`, `mapWithConcurrency`, `shuffleInPlace` | `utils/array.utils.ts` | None |
-| Upload extension resolution and attachment `Content-Disposition` headers | `utils/file.utils.ts` | None |
-| `parseJsonToInstance`, `parseJsonField` | `utils/transform.utils.ts` | None |
-| Request-log redaction and body helpers | `http-request-log/helpers/` | The pino config reuses the redaction helpers. |
-| Email branding and template rendering | `emails/helpers/` | None |
-| Account deletion helpers | `users/helpers/` | Drop the Stripe part. |
-| Soft-delete extension and `withSoftDelete` client from `prisma.service.ts` | `prisma/extensions/soft-delete.ts` | Adapted for Postgres. Section 3.9 lists the changes. |
+| Helper                                                                                                                         | Destination                        | Change                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Regex and type constants for time, documents, images, passwords, slugs, media, spreadsheets, UUIDs and email                   | `constants/`                       | Drop the ObjectId regex. Make the country and locale lists generic.                                  |
+| `sleep`                                                                                                                        | `utils/function.utils.ts`          | None                                                                                                 |
+| Date helpers for strings, ranges, timezone keys, UTC boundaries, `zonedDateTimeToUtc`, calendar bounds and validation          | `utils/date.utils.ts`              | Merge in HumanityHub's `getDateRange` and `TIME_FILTERS`.                                            |
+| `hashData`, `compareData`, phone normalizing, OTP, `stringify`, random strings, client IP, user agent parsing, `percentChange` | `utils/data.utils.ts`              | Drop ObjectId generation. Phone normalizing uses libphonenumber with a default region read from env. |
+| `isObject`, `cloneDeep`, `assign`, `omitNullFields`, `mergeObjectMaps`                                                         | `utils/object.utils.ts`            | Document `omitNullFields` as Mongo-only.                                                             |
+| `chunk`, `mapWithConcurrency`, `shuffleInPlace`                                                                                | `utils/array.utils.ts`             | None                                                                                                 |
+| Upload extension resolution and attachment `Content-Disposition` headers                                                       | `utils/file.utils.ts`              | None                                                                                                 |
+| `parseJsonToInstance`, `parseJsonField`                                                                                        | `utils/transform.utils.ts`         | None                                                                                                 |
+| Request-log redaction and body helpers                                                                                         | `http-request-log/helpers/`        | The pino config reuses the redaction helpers.                                                        |
+| Email branding and template rendering                                                                                          | `emails/helpers/`                  | None                                                                                                 |
+| Account deletion helpers                                                                                                       | `users/helpers/`                   | Drop the Stripe part.                                                                                |
+| Soft-delete extension and `withSoftDelete` client from `prisma.service.ts`                                                     | `prisma/extensions/soft-delete.ts` | Adapted for Postgres. Section 3.9 lists the changes.                                                 |
 
 **From HumanityHub `common/`**
 
-| Helper | Destination | Change |
-|---|---|---|
-| `parseBoolean` | `utils/data.utils.ts` | None |
-| `getDateRange`, `TIME_FILTERS` | `utils/date.utils.ts`, `constants/` | None |
-| `renderTemplate`, `renderMessageTemplate` | `emails/helpers/` | None |
-| `sanitizeObject`, `sanitizeHeaders`, `truncateString`, `truncateObject`, `getClientIp`, `serializeForJson` | `utils/log.utils.ts` | None |
-| `IsFutureDateConstraint`, `PasswordsMatchConstraint` | `validators/` | None |
-| `CsvExcelFileValidator`, `FileValidationPipe` | `validators/`, `pipes/` | Add a magic-byte check. |
-| `RemoveUndefinedPipe` | `pipes/` | Strip only `undefined` and keep `null`. Section 3.7 explains why. |
-| `Public`, `Roles`, `GetCurrentUser` decorators | `decorators/` | Drop `GetDataFromPayload`, which reads the wrong object. |
-| `softDeleteExtension` | Not ported | We use the Driving-Test version instead. Section 3.9 explains why. |
-| `chunk` | Merged with the Driving-Test version | None |
+| Helper                                                                                                     | Destination                          | Change                                                             |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| `parseBoolean`                                                                                             | `utils/data.utils.ts`                | None                                                               |
+| `getDateRange`, `TIME_FILTERS`                                                                             | `utils/date.utils.ts`, `constants/`  | None                                                               |
+| `renderTemplate`, `renderMessageTemplate`                                                                  | `emails/helpers/`                    | None                                                               |
+| `sanitizeObject`, `sanitizeHeaders`, `truncateString`, `truncateObject`, `getClientIp`, `serializeForJson` | `utils/log.utils.ts`                 | None                                                               |
+| `IsFutureDateConstraint`, `PasswordsMatchConstraint`                                                       | `validators/`                        | None                                                               |
+| `CsvExcelFileValidator`, `FileValidationPipe`                                                              | `validators/`, `pipes/`              | Add a magic-byte check.                                            |
+| `RemoveUndefinedPipe`                                                                                      | `pipes/`                             | Strip only `undefined` and keep `null`. Section 3.7 explains why.  |
+| `Public`, `Roles`, `GetCurrentUser` decorators                                                             | `decorators/`                        | Drop `GetDataFromPayload`, which reads the wrong object.           |
+| `softDeleteExtension`                                                                                      | Not ported                           | We use the Driving-Test version instead. Section 3.9 explains why. |
+| `chunk`                                                                                                    | Merged with the Driving-Test version | None                                                               |
 
 **From Fright-Marketplace**
 
-| Helper | Destination |
-|---|---|
-| `isPrismaUniqueConstraintError`, `prismaUniqueConstraintField`, `toUserConflictException` | `helpers/prisma-errors.ts` |
-| `PRISMA_TX_OPTIONS` | `helpers/prisma-transaction.ts` |
-| `hashToken`, `readStringField`, `readNumberField` | `utils/data.utils.ts` |
-| Released identity helpers, which replace a deleted user's email with a tombstone value | `users/helpers/` |
-| `unsetOrNull`, `NOT_*` | `helpers/mongo-optional-null.ts`, optional and Mongo-only |
+| Helper                                                                                    | Destination                                               |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `isPrismaUniqueConstraintError`, `prismaUniqueConstraintField`, `toUserConflictException` | `helpers/prisma-errors.ts`                                |
+| `PRISMA_TX_OPTIONS`                                                                       | `helpers/prisma-transaction.ts`                           |
+| `hashToken`, `readStringField`, `readNumberField`                                         | `utils/data.utils.ts`                                     |
+| Released identity helpers, which replace a deleted user's email with a tombstone value    | `users/helpers/`                                          |
+| `unsetOrNull`, `NOT_*`                                                                    | `helpers/mongo-optional-null.ts`, optional and Mongo-only |
 
 **New helpers**
 
-| Helper | What it does |
-|---|---|
-| `buildPaginationArgs(query)` | Returns `{ skip, take }` with `limit` clamped to the max. |
-| `buildPaginatedResult(items, total, page, limit)` | Returns the offset list response. |
-| `buildCursorArgs({ cursor, limit })` | Returns `{ take: limit + 1 }`, plus `{ cursor: { id }, skip: 1 }` when a cursor is given. |
-| `buildCursorResult(rows, limit)` | Drops the extra row and returns `{ items, meta: { nextCursor, hasMore, limit } }`. |
-| `buildSearchWhere(search, fields)` | Returns a case-insensitive OR across the fields, or an empty object when `search` is empty. |
-| `buildOrderBy(sortBy, sortOrder, whitelist, fallback)` | Returns an `orderBy` limited to whitelisted columns. |
-| `requireDefined(value, name)` | Throws if a value meant for a `where` clause is `undefined`. |
-| `buildPatchData(dto)` | Keeps `null`, which clears a column, and drops `undefined`, which leaves a column untouched. |
-| `softDelete(model, id)` | Sets `deletedAt` and runs the tombstone logic where a model needs it. |
+| Helper                                                 | What it does                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `buildPaginationArgs(query)`                           | Returns `{ skip, take }` with `limit` clamped to the max.                                    |
+| `buildPaginatedResult(items, total, page, limit)`      | Returns the offset list response.                                                            |
+| `buildCursorArgs({ cursor, limit })`                   | Returns `{ take: limit + 1 }`, plus `{ cursor: { id }, skip: 1 }` when a cursor is given.    |
+| `buildCursorResult(rows, limit)`                       | Drops the extra row and returns `{ items, meta: { nextCursor, hasMore, limit } }`.           |
+| `buildSearchWhere(search, fields)`                     | Returns a case-insensitive OR across the fields, or an empty object when `search` is empty.  |
+| `buildOrderBy(sortBy, sortOrder, whitelist, fallback)` | Returns an `orderBy` limited to whitelisted columns.                                         |
+| `requireDefined(value, name)`                          | Throws if a value meant for a `where` clause is `undefined`.                                 |
+| `buildPatchData(dto)`                                  | Keeps `null`, which clears a column, and drops `undefined`, which leaves a column untouched. |
+| `softDelete(model, id)`                                | Sets `deletedAt` and runs the tombstone logic where a model needs it.                        |
 
 ### 3.7 Null vs undefined on Postgres
 
@@ -291,12 +293,12 @@ When `S3_ENABLED=false`, the service throws a `ServiceUnavailableException` sayi
 
 Driving-Test and Fright have the same implementation, since Fright copied it. HumanityHub has a weaker one. We port the Driving-Test version.
 
-| Behavior | Driving-Test and Fright | HumanityHub |
-|---|---|---|
-| How the filter joins the caller's `where` | Appends to `AND`, so the caller's own conditions stay intact | Spreads `deletedAt: null` over the caller's `where`, which silently overwrites any `deletedAt` condition the caller set |
-| Operations covered | `findFirst`, `findFirstOrThrow`, `findUnique`, `findUniqueOrThrow`, `findMany`, `count`, `groupBy` | `findFirst`, `findUnique`, `findMany`, `count` |
-| Bypass for admin restore or token lookups | Use the plain client instead of `prisma.withSoftDelete` | Not possible, because the filter is merged into the service with `Object.assign` |
-| Model list | A typed `ReadonlySet` with a JSDoc note on when to add a model | A plain array |
+| Behavior                                  | Driving-Test and Fright                                                                            | HumanityHub                                                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| How the filter joins the caller's `where` | Appends to `AND`, so the caller's own conditions stay intact                                       | Spreads `deletedAt: null` over the caller's `where`, which silently overwrites any `deletedAt` condition the caller set |
+| Operations covered                        | `findFirst`, `findFirstOrThrow`, `findUnique`, `findUniqueOrThrow`, `findMany`, `count`, `groupBy` | `findFirst`, `findUnique`, `findMany`, `count`                                                                          |
+| Bypass for admin restore or token lookups | Use the plain client instead of `prisma.withSoftDelete`                                            | Not possible, because the filter is merged into the service with `Object.assign`                                        |
+| Model list                                | A typed `ReadonlySet` with a JSDoc note on when to add a model                                     | A plain array                                                                                                           |
 
 The port makes these changes.
 
@@ -318,14 +320,14 @@ Two limits remain, and `backend-database.mdc` spells them out for agents.
 
 The frontend runs Next.js 16 with the App Router and the React Compiler, React 19, strict TypeScript and Tailwind 4.
 
-| Concern | Packages |
-|---|---|
-| UI | shadcn on Radix, `lucide-react`, `next-themes`, `sonner` |
-| Data | `@tanstack/react-query`, `axios`, `server-only` |
-| Forms | `react-hook-form`, `@hookform/resolvers`, Zod |
-| URL state for tables | `nuqs` |
-| Dates | `date-fns` |
-| Dev | ESLint with `eslint-config-next` and the `react-hooks` compiler rules, Prettier with `prettier-plugin-tailwindcss` |
+| Concern              | Packages                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| UI                   | shadcn on Radix, `lucide-react`, `next-themes`, `sonner`                                                           |
+| Data                 | `@tanstack/react-query`, `axios`, `server-only`                                                                    |
+| Forms                | `react-hook-form`, `@hookform/resolvers`, Zod                                                                      |
+| URL state for tables | `nuqs`                                                                                                             |
+| Dates                | `date-fns`                                                                                                         |
+| Dev                  | ESLint with `eslint-config-next` and the `react-hooks` compiler rules, Prettier with `prettier-plugin-tailwindcss` |
 
 ### 4.2 Folder structure
 
@@ -385,26 +387,26 @@ frontend/
 
 The two HTTP clients split by where the code runs.
 
-| Situation | Client | Reason |
-|---|---|---|
-| Client components, React Query queries and mutations, form submits | Axios (`services/http/client.ts`) | Interceptors handle the 401 refresh queue and map errors to `ApiError` in one place. Axios also reports upload progress, which the S3 upload UI will need later. |
-| Server components, `generateMetadata`, `sitemap.ts` and other server-side reads | `fetch` (`services/http/server.ts`) | Next's `cache`, `revalidate` and tags work only with `fetch`. The client reads cookies with `cookies()` and forwards them. |
-| Streaming responses such as server-sent events | `fetch` | Axios can't read a streamed response body in the browser. |
+| Situation                                                                       | Client                              | Reason                                                                                                                                                           |
+| ------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client components, React Query queries and mutations, form submits              | Axios (`services/http/client.ts`)   | Interceptors handle the 401 refresh queue and map errors to `ApiError` in one place. Axios also reports upload progress, which the S3 upload UI will need later. |
+| Server components, `generateMetadata`, `sitemap.ts` and other server-side reads | `fetch` (`services/http/server.ts`) | Next's `cache`, `revalidate` and tags work only with `fetch`. The client reads cookies with `cookies()` and forwards them.                                       |
+| Streaming responses such as server-sent events                                  | `fetch`                             | Axios can't read a streamed response body in the browser.                                                                                                        |
 
 Each feature service file, such as `users.service.ts`, exports browser functions built on axios. Server-side reads for that feature live in a matching `users.server.ts` that starts with `import 'server-only'`.
 
 ### 4.4 Helpers carried over
 
-| Helper | Source |
-|---|---|
-| `cn`, `omitEmptyStringEntries`, `sanitizeRedirectPath`, `parseBoolean` | Driving-Test `lib/utils.ts` |
-| `getPageNumbers`, `getPaginationRange` | Driving-Test `lib/pagination.ts` |
-| Date formatting and the date-range query builder | Driving-Test `lib/date.ts` |
-| Abort detection and the envelope reader | Driving-Test `lib/http.ts` |
-| `withSignal` | Driving-Test `lib/react-query.ts` |
-| `useTableRefresh`, `useScrolled`, `useMobile` | Driving-Test hooks |
-| `useDebouncedValue` as one shared hook with a 350 ms default, and `useTablePage` | Fright hooks |
-| `DataTablePagination` | Driving-Test component |
+| Helper                                                                           | Source                            |
+| -------------------------------------------------------------------------------- | --------------------------------- |
+| `cn`, `omitEmptyStringEntries`, `sanitizeRedirectPath`, `parseBoolean`           | Driving-Test `lib/utils.ts`       |
+| `getPageNumbers`, `getPaginationRange`                                           | Driving-Test `lib/pagination.ts`  |
+| Date formatting and the date-range query builder                                 | Driving-Test `lib/date.ts`        |
+| Abort detection and the envelope reader                                          | Driving-Test `lib/http.ts`        |
+| `withSignal`                                                                     | Driving-Test `lib/react-query.ts` |
+| `useTableRefresh`, `useScrolled`, `useMobile`                                    | Driving-Test hooks                |
+| `useDebouncedValue` as one shared hook with a 350 ms default, and `useTablePage` | Fright hooks                      |
+| `DataTablePagination`                                                            | Driving-Test component            |
 
 ---
 
@@ -446,24 +448,24 @@ The audit log uses the same table look and toolbar, with filters for actor, acti
 
 ## 6. Marketing, SEO and public pages
 
-| Requirement | How we build it |
-|---|---|
-| Meta title and description on every page | Every `page.tsx` must export `metadata` or `generateMetadata`. The root layout sets `title.template` from `site.config.ts`. |
-| CTA above the fold | The hero holds the primary CTA, and the CTA shows without scrolling at both 375 px and 1280 px widths. |
-| Sticky mobile CTA | `StickyMobileCta` appears below the `md` breakpoint once the hero scrolls out of view. |
-| Favicon | `app/icon.png`, `app/apple-icon.png` and `manifest.ts`. |
-| robots.txt | `app/robots.ts` disallows `/admin`, `/account` and the auth pages. |
-| sitemap.xml | `app/sitemap.ts` lists the public routes. |
-| Open Graph image | `app/opengraph-image.tsx` generates the image from the site name and tagline. The metadata also sets the Twitter card. |
-| Alt text | Every `next/image` gets meaningful `alt` text. Decorative images get `alt=""`. |
-| Compressed images | All images go through `next/image`, which serves AVIF or WebP. Static assets ship pre-compressed with `sizes` set. Only the hero image gets `priority`. |
-| Mobile breakpoints | Tailwind classes start from mobile. We check every page at 375, 768 and 1280 px. |
-| Loading states | Each route group has a `loading.tsx`. Tables show skeletons, and every action button uses `LoadingButton`. |
-| Form error states | Errors show under each field, and `FormErrorAlert` shows form-level errors. Backend field errors map onto the matching fields. |
-| Thank-you page | `/thank-you` shows after registration, tells the user to check their inbox and offers a resend button. |
-| Privacy and Terms | `/privacy` and `/terms` hold placeholder content filled from `site.config.ts`. |
-| Custom 404 | `app/not-found.tsx` links to the home page and to login. |
-| Private pages | Admin, account and auth pages set `robots: { index: false }`. |
+| Requirement                              | How we build it                                                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Meta title and description on every page | Every `page.tsx` must export `metadata` or `generateMetadata`. The root layout sets `title.template` from `site.config.ts`.                             |
+| CTA above the fold                       | The hero holds the primary CTA, and the CTA shows without scrolling at both 375 px and 1280 px widths.                                                  |
+| Sticky mobile CTA                        | `StickyMobileCta` appears below the `md` breakpoint once the hero scrolls out of view.                                                                  |
+| Favicon                                  | `app/icon.png`, `app/apple-icon.png` and `manifest.ts`.                                                                                                 |
+| robots.txt                               | `app/robots.ts` disallows `/admin`, `/account` and the auth pages.                                                                                      |
+| sitemap.xml                              | `app/sitemap.ts` lists the public routes.                                                                                                               |
+| Open Graph image                         | `app/opengraph-image.tsx` generates the image from the site name and tagline. The metadata also sets the Twitter card.                                  |
+| Alt text                                 | Every `next/image` gets meaningful `alt` text. Decorative images get `alt=""`.                                                                          |
+| Compressed images                        | All images go through `next/image`, which serves AVIF or WebP. Static assets ship pre-compressed with `sizes` set. Only the hero image gets `priority`. |
+| Mobile breakpoints                       | Tailwind classes start from mobile. We check every page at 375, 768 and 1280 px.                                                                        |
+| Loading states                           | Each route group has a `loading.tsx`. Tables show skeletons, and every action button uses `LoadingButton`.                                              |
+| Form error states                        | Errors show under each field, and `FormErrorAlert` shows form-level errors. Backend field errors map onto the matching fields.                          |
+| Thank-you page                           | `/thank-you` shows after registration, tells the user to check their inbox and offers a resend button.                                                  |
+| Privacy and Terms                        | `/privacy` and `/terms` hold placeholder content filled from `site.config.ts`.                                                                          |
+| Custom 404                               | `app/not-found.tsx` links to the home page and to login.                                                                                                |
+| Private pages                            | Admin, account and auth pages set `robots: { index: false }`.                                                                                           |
 
 ---
 
@@ -508,7 +510,29 @@ The frontend ESLint config has these settings.
 
 On every commit, Husky runs lint-staged on the staged files. Lint-staged runs Prettier, `eslint --fix` and secretlint. On push, Husky runs `audit:security`.
 
-Each app has the scripts `dev`, `build`, `start`, `lint`, `lint:fix`, `format` and `typecheck`. The backend also has `test` and `test:e2e`.
+Each app has the scripts `dev`, `build`, `start`, `lint`, `lint:fix`, `format` and `typecheck`. The backend also has `test` and `test:e2e`, which runs the Jest API tests.
+
+### 8.1 Browser end-to-end tests
+
+`e2e/` is its own npm project with `@playwright/test`, because its tests span both apps. Each run works like this.
+
+1. Global setup runs `prisma migrate reset` against `boilerplate_e2e`, seeds the super admin and empties the Mailpit inbox.
+2. Playwright's `webServer` builds and starts the backend on port 4001 and the frontend on port 4000. The dev servers on 3000 and 3001 keep running alongside it.
+3. The backend runs with `EMAIL_TRANSPORT=smtp`, which sends mail to Mailpit on port 1025. Tests read messages through the Mailpit API on port 8025 and open the link inside.
+4. The backend runs with `RATE_LIMIT_ENABLED=false`, because every test signs in from the same IP. The env schema refuses that value, and the `smtp` transport, when `NODE_ENV=production`.
+
+The suite covers these journeys.
+
+| Spec            | Journey                                                                       |
+| --------------- | ----------------------------------------------------------------------------- |
+| `auth.spec.ts`  | Register, open the verification email, verify, sign in and land on `/account` |
+| `auth.spec.ts`  | A wrong password shows the generic error                                      |
+| `auth.spec.ts`  | Forgot password, open the reset email, set a new password and sign in with it |
+| `auth.spec.ts`  | Sign out, then `/account` redirects to login                                  |
+| `admin.spec.ts` | A regular user who opens `/admin` lands on `/account`                         |
+| `admin.spec.ts` | The admin finds a user, suspends them, and that user can no longer sign in    |
+
+Run `npm run test` from `e2e/` with Docker running. It takes about a minute, so it isn't in the pre-push hook. `npm run test:ui` opens Playwright's UI mode, and a failed test saves a trace you can open with `npx playwright show-trace`. When the project adds CI, this suite is the first job to add.
 
 ---
 
@@ -516,40 +540,42 @@ Each app has the scripts `dev`, `build`, `start`, `lint`, `lint:fix`, `format` a
 
 The rules live in the root `.cursor/rules/`. Each file opens with a short purpose and a Must and Never list. Good and bad examples follow, and a review checklist closes the file.
 
-| File | Applies to | Covers |
-|---|---|---|
-| `core.mdc` | Always | No em dashes. The comment and JSDoc policy. Const objects instead of magic strings. Module and barrel structure. Searching existing helpers before writing a new one. |
-| `security.mdc` | Always | Section 7 |
-| `os-specific-shell.mdc` | Always | Your existing PowerShell rule, unchanged |
-| `backend-architecture.mdc` | `backend/**` | Module layout, one controller per module, DTOs, guards, the response envelope, errors, config and logging |
-| `backend-database.mdc` | `backend/**` | `select` and `where` discipline, nested selects, N+1 queries, batching, transactions, the list contract, null vs undefined, and the Mongo appendix |
-| `frontend-architecture.mdc` | `frontend/**` | Folder layout, the services layer, React Query, server vs client components, React 19 and the Compiler, and `set-state-in-effect` |
-| `frontend-ui.mdc` | `frontend/**` | shadcn usage and install commands, the admin shell, forms, loading buttons, tables and mobile breakpoints |
-| `frontend-seo-marketing.mdc` | `frontend/src/app/**` | Section 6 |
+| File                         | Applies to            | Covers                                                                                                                                                                |
+| ---------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core.mdc`                   | Always                | No em dashes. The comment and JSDoc policy. Const objects instead of magic strings. Module and barrel structure. Searching existing helpers before writing a new one. |
+| `security.mdc`               | Always                | Section 7                                                                                                                                                             |
+| `os-specific-shell.mdc`      | Always                | Your existing PowerShell rule, unchanged                                                                                                                              |
+| `backend-architecture.mdc`   | `backend/**`          | Module layout, one controller per module, DTOs, guards, the response envelope, errors, config and logging                                                             |
+| `backend-database.mdc`       | `backend/**`          | `select` and `where` discipline, nested selects, N+1 queries, batching, transactions, the list contract, null vs undefined, and the Mongo appendix                    |
+| `frontend-architecture.mdc`  | `frontend/**`         | Folder layout, the services layer, React Query, server vs client components, React 19 and the Compiler, and `set-state-in-effect`                                     |
+| `frontend-ui.mdc`            | `frontend/**`         | shadcn usage and install commands, the admin shell, forms, loading buttons, tables and mobile breakpoints                                                             |
+| `frontend-seo-marketing.mdc` | `frontend/src/app/**` | Section 6                                                                                                                                                             |
+| `e2e-testing.mdc`            | `e2e/**`              | Which journeys get a browser test, selectors, test data, waiting and the email inbox                                                                                  |
 
 ### Requirement map
 
-| Your requirement | Rule file |
-|---|---|
-| 1. Best code practices, module structure, const helpers | `core`, `backend-architecture`, `frontend-architecture` |
-| 2. No em dashes | `core` |
-| 3. Proper UI practices | `frontend-ui` |
-| 4. Pagination, search and filters on every table, with debounced search | `frontend-ui`, `backend-database` |
-| 5. Proper shadcn usage | `frontend-ui` |
-| 6. Portal templates and the admin layout | `frontend-ui` |
-| 7. ESLint and Prettier from the start | `core`, plus the tooling in section 8 |
-| 8. DB call optimization | `backend-database` |
-| 9. Where conditions, minimal selects and nested selects | `backend-database` |
-| 10. Null vs undefined, replacing the Mongo unset rule | `backend-database` |
-| 11. Frontend services layer | `frontend-architecture` |
-| 12. Loading states on buttons | `frontend-ui` |
-| 13. Copy all helpers | Sections 3.6 and 4.4, and `core` tells agents to reuse them |
-| 14. Meaningful comments and JSDoc | `core` |
-| 15. Server vs client components | `frontend-architecture` |
-| 16. `set-state-in-effect` | `frontend-architecture` |
-| 17. React 19 features | `frontend-architecture` |
-| Landing and SEO checklist: 404, meta, OG, robots, sitemap, CTA, images, legal pages, thank-you page | `frontend-seo-marketing` |
-| Security | `security` |
+| Your requirement                                                                                    | Rule file                                                   |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1. Best code practices, module structure, const helpers                                             | `core`, `backend-architecture`, `frontend-architecture`     |
+| 2. No em dashes                                                                                     | `core`                                                      |
+| 3. Proper UI practices                                                                              | `frontend-ui`                                               |
+| 4. Pagination, search and filters on every table, with debounced search                             | `frontend-ui`, `backend-database`                           |
+| 5. Proper shadcn usage                                                                              | `frontend-ui`                                               |
+| 6. Portal templates and the admin layout                                                            | `frontend-ui`                                               |
+| 7. ESLint and Prettier from the start                                                               | `core`, plus the tooling in section 8                       |
+| 8. DB call optimization                                                                             | `backend-database`                                          |
+| 9. Where conditions, minimal selects and nested selects                                             | `backend-database`                                          |
+| 10. Null vs undefined, replacing the Mongo unset rule                                               | `backend-database`                                          |
+| 11. Frontend services layer                                                                         | `frontend-architecture`                                     |
+| 12. Loading states on buttons                                                                       | `frontend-ui`                                               |
+| 13. Copy all helpers                                                                                | Sections 3.6 and 4.4, and `core` tells agents to reuse them |
+| 14. Meaningful comments and JSDoc                                                                   | `core`                                                      |
+| 15. Server vs client components                                                                     | `frontend-architecture`                                     |
+| 16. `set-state-in-effect`                                                                           | `frontend-architecture`                                     |
+| 17. React 19 features                                                                               | `frontend-architecture`                                     |
+| Landing and SEO checklist: 404, meta, OG, robots, sitemap, CTA, images, legal pages, thank-you page | `frontend-seo-marketing`                                    |
+| Security                                                                                            | `security`                                                  |
+| End-to-end tests for signup and login                                                               | `e2e-testing`                                               |
 
 ---
 
@@ -557,21 +583,22 @@ The rules live in the root `.cursor/rules/`. Each file opens with a short purpos
 
 Each phase ends with a review before the next one starts.
 
-| Phase | Work | Review gate |
-|---|---|---|
-| 0 | Write the 8 rule files and `docs/RULES.md`. Delete the stale rules. | You review the rules. |
-| 1 | Scaffold the repo with root tooling, Husky, lint-staged, secretlint, `.nvmrc` and a README skeleton. | `npm install` succeeds and the hooks run. |
-| 2 | Build the backend foundation: the Nest app, `backend/docker-compose.yml`, the env schema, Prisma and migrations, the shared module and helpers, pino, helmet, CORS, the throttler, Swagger, the health check and the Dockerfile. | Lint, typecheck and unit tests pass, and the app boots. |
-| 3 | Build auth and emails: JWT cookies, refresh rotation, verification, reset, change password and the seed script. | The end-to-end auth test passes. |
-| 4 | Build the users endpoints for both `/me` and admin, the dashboard KPI endpoint, the audit log, uploads and the optional request log. | The endpoints show in Swagger and the tests pass. |
-| 5 | Build the frontend foundation: the Next app, shadcn on Radix, theme tokens, providers, the services layer, `proxy.ts`, rewrites and security headers. | Lint, typecheck and build pass. |
-| 6 | Build the marketing and SEO pages: landing, privacy, terms, thank-you, 404, robots, sitemap, OG image and icons. | Lighthouse SEO and accessibility scores pass. |
-| 7 | Build the auth pages and `/account`. | Register, verify, login and reset all work locally end to end. |
-| 8 | Build the admin portal: the shell, dashboard, users table, audit log and profile. | The portal matches the screenshot and every table feature works. |
-| 9 | Do a final pass: write the "start a new project" guide in the README, check the code against the rules, delete the two `.code-workspace` files and clean up. | A fresh clone reaches a running app in under 10 minutes. |
+| Phase | Work                                                                                                                                                                                                                             | Review gate                                                      |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 0     | Write the 8 rule files and `docs/RULES.md`. Delete the stale rules.                                                                                                                                                              | You review the rules.                                            |
+| 1     | Scaffold the repo with root tooling, Husky, lint-staged, secretlint, `.nvmrc` and a README skeleton.                                                                                                                             | `npm install` succeeds and the hooks run.                        |
+| 2     | Build the backend foundation: the Nest app, `backend/docker-compose.yml`, the env schema, Prisma and migrations, the shared module and helpers, pino, helmet, CORS, the throttler, Swagger, the health check and the Dockerfile. | Lint, typecheck and unit tests pass, and the app boots.          |
+| 3     | Build auth and emails: JWT cookies, refresh rotation, verification, reset, change password and the seed script.                                                                                                                  | The end-to-end auth test passes.                                 |
+| 4     | Build the users endpoints for both `/me` and admin, the dashboard KPI endpoint, the audit log, uploads and the optional request log.                                                                                             | The endpoints show in Swagger and the tests pass.                |
+| 5     | Build the frontend foundation: the Next app, shadcn on Radix, theme tokens, providers, the services layer, `proxy.ts`, rewrites and security headers.                                                                            | Lint, typecheck and build pass.                                  |
+| 6     | Build the marketing and SEO pages: landing, privacy, terms, thank-you, 404, robots, sitemap, OG image and icons.                                                                                                                 | Lighthouse SEO and accessibility scores pass.                    |
+| 7     | Build the auth pages and `/account`.                                                                                                                                                                                             | Register, verify, login and reset all work locally end to end.   |
+| 8     | Build the admin portal: the shell, dashboard, users table, audit log and profile.                                                                                                                                                | The portal matches the screenshot and every table feature works. |
+| 9     | Add the Playwright suite in `e2e/`, Mailpit in `backend/docker-compose.yml`, the SMTP email transport, the rate-limit switch and `e2e-testing.mdc`.                                                                              | `npm run test` in `e2e/` passes.                                 |
+| 10    | Do a final pass: write the "start a new project" guide in the README, check the code against the rules, delete the two `.code-workspace` files and clean up.                                                                     | A fresh clone reaches a running app in under 10 minutes.         |
 
 ---
 
 ## 11. Open items
 
-Phases 0 through 8 are done. Phase 9 has not started. Admins land on `/admin/dashboard`. Everyone else lands on `/account`.
+Phases 0 through 9 are done. Phase 10 has not started. Admins land on `/admin/dashboard`. Everyone else lands on `/account`.

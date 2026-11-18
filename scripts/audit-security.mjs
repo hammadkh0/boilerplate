@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const APP_DIRECTORIES = ['backend', 'frontend'];
+const APP_DIRECTORIES = ['backend', 'frontend', 'e2e'];
 
 /**
  * Runs `npm audit --audit-level=high` in the repo root and in each app that already has a package.json.

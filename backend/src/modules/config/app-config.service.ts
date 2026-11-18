@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CountryCode } from 'libphonenumber-js';
 
+import { ENVIRONMENTS } from '../shared/constants';
 import type { Env } from './env.schema';
 
 /**
@@ -17,7 +18,7 @@ export class AppConfigService {
   }
 
   get isProduction(): boolean {
-    return this.nodeEnv === 'production';
+    return this.nodeEnv === ENVIRONMENTS.PRODUCTION;
   }
 
   get port(): number {
@@ -72,8 +73,26 @@ export class AppConfigService {
     return this.config.get('TRUST_PROXY', { infer: true }) === 'true';
   }
 
+  get rateLimitEnabled(): boolean {
+    return this.config.get('RATE_LIMIT_ENABLED', { infer: true }) === 'true';
+  }
+
   get appName(): string {
     return this.config.get('APP_NAME', { infer: true });
+  }
+
+  get emailTransport(): Env['EMAIL_TRANSPORT'] {
+    return this.config.get('EMAIL_TRANSPORT', { infer: true });
+  }
+
+  /** Host and port for `EMAIL_TRANSPORT=smtp`. Throws when either is missing. */
+  get smtp(): { host: string; port: number } {
+    const host = this.config.get('SMTP_HOST', { infer: true });
+    const port = this.config.get('SMTP_PORT', { infer: true });
+    if (!host || !port) {
+      throw new Error('SMTP_HOST and SMTP_PORT are required');
+    }
+    return { host, port };
   }
 
   get emailFrom(): string {
