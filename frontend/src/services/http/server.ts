@@ -1,10 +1,11 @@
 import 'server-only';
 
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
-import { API_PREFIX } from '@/constants';
+import { API_PREFIX, ROUTES } from '@/constants';
 import { getServerEnv } from '@/config/server-env';
-import { ApiError, unwrapEnvelope } from '@/lib/http';
+import { ApiError, isFailure, unwrapEnvelope } from '@/lib/http';
 
 type ServerFetchInit = {
   method?: 'GET' | 'POST';
@@ -17,6 +18,8 @@ type ServerFetchInit = {
 /**
  * Server-side read through `fetch`, so Next can cache or opt out.
  * Forwards the incoming cookies. Admin and account reads should pass `cache: 'no-store'`.
+ * A 401 means the session was revoked or expired, so it redirects to the login page.
+ * A 403 redirects to the account page, because pages render in parallel with the admin layout gate.
  */
 export async function serverFetch<T>(path: string, init: ServerFetchInit = {}): Promise<T> {
   const { BACKEND_URL } = getServerEnv();
@@ -40,25 +43,16 @@ export async function serverFetch<T>(path: string, init: ServerFetchInit = {}): 
     },
   });
 
-  const body: unknown = await response.json().catch(() => undefined);
-  if (!response.ok) {
-    if (
-      typeof body === 'object' &&
-      body !== null &&
-      'success' in body &&
-      body.success === false &&
-      'error' in body &&
-      typeof body.error === 'object' &&
-      body.error !== null &&
-      'message' in body.error &&
-      typeof body.error.message === 'string' &&
-      'statusCode' in body.error &&
-      typeof body.error.statusCode === 'number'
-    ) {
-      throw new ApiError(body.error.statusCode, body.error.message);
-    }
-    throw new ApiError(response.status, 'Request failed');
+  if (response.status === 401) {
+    redirect(ROUTES.LOGIN);
+  }
+  if (response.status === 403) {
+    redirect(ROUTES.ACCOUNT);
   }
 
+  const body: unknown = await response.json().catch(() => undefined);
+  if (!response.ok && !isFailure(body)) {
+    throw new ApiError(response.status, 'Request failed');
+  }
   return unwrapEnvelope<T>(body);
 }

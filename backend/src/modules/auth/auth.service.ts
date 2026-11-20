@@ -26,6 +26,7 @@ import { AUTH_USER_SELECT, type AuthUserProfile } from './types';
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly lastEmailAt = new Map<string, number>();
+  private readonly dummyPasswordHash = hashData(generateRandomString(16));
 
   constructor(
     private readonly prisma: PrismaService,
@@ -112,11 +113,12 @@ export class AuthService {
         passwordHash: true,
       },
     });
-    if (
-      !user ||
-      user.status !== UserStatus.ACTIVE ||
-      !(await compareData(password, user.passwordHash))
-    ) {
+    // Unknown emails still pay for a bcrypt compare so response time does not reveal which emails exist.
+    const passwordMatches = await compareData(
+      password,
+      user?.passwordHash ?? (await this.dummyPasswordHash),
+    );
+    if (!user || user.status !== UserStatus.ACTIVE || !passwordMatches) {
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_CREDENTIALS);
     }
 
@@ -265,12 +267,25 @@ export class AuthService {
     });
   }
 
+  /**
+   * Checks if the email can be sent based on the cooldown period. Cooldown exists because sending too many emails can be spammy.
+   * @param kind - The type of email to send.
+   * @param email - The email address to send the email to.
+   * @returns True if the email can be sent, false otherwise. If the email can be sent, the email is added to the map.
+   */
   private canSend(kind: string, email: string): boolean {
+    // The key is a combination of the email type and the email address.
     const key = `${kind}:${email}`;
     const previous = this.lastEmailAt.get(key);
     const now = Date.now();
     if (previous !== undefined && now - previous < EMAIL_COOLDOWN_MS) {
       return false;
+    }
+    // Remove old entries from the map to prevent memory leaks.
+    for (const [storedKey, sentAt] of this.lastEmailAt) {
+      if (now - sentAt >= EMAIL_COOLDOWN_MS) {
+        this.lastEmailAt.delete(storedKey);
+      }
     }
     this.lastEmailAt.set(key, now);
     return true;

@@ -48,27 +48,27 @@ The site is `http://localhost:3000`. It rewrites `/api/v1` to `BACKEND_URL`. Sig
 
 ### Make it yours
 
-| What | Where |
-| --- | --- |
-| Site name, tagline, contact email, legal date | `frontend/src/config/site.config.ts` |
-| Product name in emails and the API | `APP_NAME` in `backend/.env` |
-| Green color | `--primary` in `frontend/src/app/globals.css`, light and dark |
-| Privacy and terms | `frontend/src/constants/copy/marketing.ts` |
-| Favicon | `frontend/src/app/icon.png` and `frontend/src/app/apple-icon.png` |
+| What                                          | Where                                                             |
+| --------------------------------------------- | ----------------------------------------------------------------- |
+| Site name, tagline, contact email, legal date | `frontend/src/config/site.config.ts`                              |
+| Product name in emails and the API            | `APP_NAME` in `backend/.env`                                      |
+| Green color                                   | `--primary` in `frontend/src/app/globals.css`, light and dark     |
+| Privacy and terms                             | `frontend/src/constants/copy/marketing.ts`                        |
+| Favicon                                       | `frontend/src/app/icon.png` and `frontend/src/app/apple-icon.png` |
 
 ## Day to day
 
-| Script | Where | What it does |
-| --- | --- | --- |
-| `npm run format` | root | Formats the repo with Prettier |
-| `npm run secretlint` | root | Scans for committed secrets |
-| `npm run audit:security` | root | `npm audit` at high severity for the root and each app |
-| `npm run dev` | `backend/` or `frontend/` | Starts that app |
-| `npm run lint` | either app | ESLint |
-| `npm run typecheck` | either app | TypeScript |
-| `npm test` | `backend/` | Jest unit tests |
-| `npm run test:e2e` | `backend/` | Jest API tests |
-| `npm run test` | `e2e/` | Playwright browser tests |
+| Script                   | Where                     | What it does                                           |
+| ------------------------ | ------------------------- | ------------------------------------------------------ |
+| `npm run format`         | root                      | Formats the repo with Prettier                         |
+| `npm run secretlint`     | root                      | Scans for committed secrets                            |
+| `npm run audit:security` | root                      | `npm audit` at high severity for the root and each app |
+| `npm run dev`            | `backend/` or `frontend/` | Starts that app                                        |
+| `npm run lint`           | either app                | ESLint                                                 |
+| `npm run typecheck`      | either app                | TypeScript                                             |
+| `npm test`               | `backend/`                | Jest unit tests                                        |
+| `npm run test:e2e`       | `backend/`                | Jest API tests                                         |
+| `npm run test`           | `e2e/`                    | Playwright browser tests                               |
 
 Before each commit, Git runs lint-staged. Before each push, Git runs `npm run audit:security`.
 

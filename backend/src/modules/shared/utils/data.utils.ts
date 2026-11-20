@@ -121,19 +121,16 @@ export function generateRandomString(byteLength: number): string {
 }
 
 type RequestLike = {
-  headers?: Record<string, string | string[] | undefined>;
   socket?: { remoteAddress?: string };
   ip?: string;
 };
 
-/** First public address from `x-forwarded-for`, then `x-real-ip`, then the socket. */
+/**
+ * Express `request.ip`, which honours the `trust proxy` hop count set in `configure-app.ts`.
+ * Raw forwarding headers are ignored because any client can set them.
+ */
 export function getClientIp(request: RequestLike): string | undefined {
-  const forwarded = request.headers?.['x-forwarded-for'];
-  const forwardedIp = typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : undefined;
-  const realIp = request.headers?.['x-real-ip'];
-  const realIpValue = typeof realIp === 'string' ? realIp : undefined;
-
-  return forwardedIp || realIpValue || request.socket?.remoteAddress || request.ip;
+  return request.ip || request.socket?.remoteAddress;
 }
 
 /** Browser, OS, and device summary for a user-agent string. */

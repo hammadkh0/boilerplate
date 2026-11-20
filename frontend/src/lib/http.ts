@@ -39,7 +39,7 @@ function isSuccess<T>(value: unknown): value is ApiSuccess<T> {
   );
 }
 
-function isFailure(value: unknown): value is ApiFailure {
+export function isFailure(value: unknown): value is ApiFailure {
   return (
     typeof value === 'object' &&
     value !== null &&
