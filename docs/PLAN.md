@@ -1,6 +1,6 @@
 # Boilerplate plan
 
-Status: phases 0 through 9 are done. Phase 10 has not started.
+Status: phases 0 through 10 are done.
 
 This boilerplate is the starting point for new client projects. It holds a NestJS backend and a Next.js frontend in one repo. Its Cursor rules tell AI agents how to write code here, so the code they produce stays consistent, secure and fast.
 
@@ -516,8 +516,8 @@ Each app has the scripts `dev`, `build`, `start`, `lint`, `lint:fix`, `format` a
 
 `e2e/` is its own npm project with `@playwright/test`, because its tests span both apps. Each run works like this.
 
-1. Global setup runs `prisma migrate reset` against `boilerplate_e2e`, seeds the super admin and empties the Mailpit inbox.
-2. Playwright's `webServer` builds and starts the backend on port 4001 and the frontend on port 4000. The dev servers on 3000 and 3001 keep running alongside it.
+1. Global setup empties the Mailpit inbox.
+2. Playwright's `webServer` resets `boilerplate_e2e`, seeds the super admin, then builds and starts the backend on port 4001 and the frontend on port 4000. The dev servers on 3000 and 3001 keep running alongside it.
 3. The backend runs with `EMAIL_TRANSPORT=smtp`, which sends mail to Mailpit on port 1025. Tests read messages through the Mailpit API on port 8025 and open the link inside.
 4. The backend runs with `RATE_LIMIT_ENABLED=false`, because every test signs in from the same IP. The env schema refuses that value, and the `smtp` transport, when `NODE_ENV=production`.
 
@@ -601,4 +601,4 @@ Each phase ends with a review before the next one starts.
 
 ## 11. Open items
 
-Phases 0 through 9 are done. Phase 10 has not started. Admins land on `/admin/dashboard`. Everyone else lands on `/account`.
+Phases 0 through 10 are done. Admins land on `/admin/dashboard`. Everyone else lands on `/account`.

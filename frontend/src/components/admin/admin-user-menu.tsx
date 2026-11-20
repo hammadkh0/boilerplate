@@ -2,11 +2,7 @@
 
 import { LogOut, UserRound } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { LoadingButton } from '@/components/forms/loading-button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -14,12 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ACCOUNT_COPY } from '@/constants/copy/account';
 import { ADMIN_COPY } from '@/constants/copy/admin';
 import { ROUTES } from '@/constants';
-import { mapApiFieldErrors } from '@/lib/map-api-field-errors';
-import { USERS_QUERY_KEYS } from '@/queries/users';
-import { logout } from '@/services/auth.service';
+import { useSignOut } from '@/hooks/use-sign-out';
 import type { UserProfile } from '@/types';
 
 function initial(name: string): string {
@@ -28,23 +21,7 @@ function initial(name: string): string {
 }
 
 export function AdminUserMenu({ user, compact = false }: { user: UserProfile; compact?: boolean }) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: () => logout(),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: USERS_QUERY_KEYS.all });
-      toast.success(ACCOUNT_COPY.SIGN_OUT_SUCCESS);
-      router.push(ROUTES.HOME);
-      router.refresh();
-    },
-    onError: (error) => {
-      const mapped = mapApiFieldErrors(error);
-      if (mapped.formMessage) {
-        toast.error(mapped.formMessage);
-      }
-    },
-  });
+  const signOut = useSignOut();
 
   return (
     <DropdownMenu>
@@ -86,10 +63,10 @@ export function AdminUserMenu({ user, compact = false }: { user: UserProfile; co
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
-          disabled={mutation.isPending}
+          disabled={signOut.isPending}
           onSelect={(event) => {
             event.preventDefault();
-            mutation.mutate();
+            signOut.mutate();
           }}
         >
           <LogOut aria-hidden />
@@ -97,37 +74,5 @@ export function AdminUserMenu({ user, compact = false }: { user: UserProfile; co
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-export function AdminSignOutButton() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: () => logout(),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: USERS_QUERY_KEYS.all });
-      toast.success(ACCOUNT_COPY.SIGN_OUT_SUCCESS);
-      router.push(ROUTES.HOME);
-      router.refresh();
-    },
-    onError: (error) => {
-      const mapped = mapApiFieldErrors(error);
-      if (mapped.formMessage) {
-        toast.error(mapped.formMessage);
-      }
-    },
-  });
-
-  return (
-    <LoadingButton
-      type="button"
-      variant="outline"
-      className="h-10"
-      loading={mutation.isPending}
-      onClick={() => mutation.mutate()}
-    >
-      {ADMIN_COPY.LOG_OUT}
-    </LoadingButton>
   );
 }

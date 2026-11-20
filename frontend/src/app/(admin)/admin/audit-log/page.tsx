@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { toAuditListQuery } from '@/components/audit-log/list-query';
 import { AuditLogTable } from '@/components/audit-log/audit-log-table';
 import { PageHeader } from '@/components/admin/page-header';
-import { auditSearchParams } from '@/components/users/search-params';
+import { auditSearchParams } from '@/components/audit-log/search-params';
 import { ADMIN_COPY } from '@/constants/copy/admin';
 import { PRIVATE_PAGE_ROBOTS } from '@/constants';
 import { listAuditLogsServer } from '@/services/audit-log.server';

@@ -23,6 +23,7 @@ export default defineConfig({
       url: `${BACKEND_URL}/health`,
       env: {
         ...BACKEND_ENV,
+        // Prisma blocks migrate reset from an agent unless this carries the user's consent.
         ...(process.env.PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION
           ? {
               PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION:

@@ -1,13 +1,5 @@
+import { calendarDateEnd, calendarDateStart } from '@/lib/date';
 import type { ListUsersQuery, SortOrder, UserRole, UserStatus } from '@/types';
-
-function dayStart(value: string): string | undefined {
-  return value ? `${value}T00:00:00.000Z` : undefined;
-}
-
-/** A date-only "to" value would stop at midnight and hide the rest of that day. */
-function dayEnd(value: string): string | undefined {
-  return value ? `${value}T23:59:59.999Z` : undefined;
-}
 
 export function toUsersListQuery(state: {
   page: number;
@@ -31,7 +23,7 @@ export function toUsersListQuery(state: {
     status: state.status ?? undefined,
     emailVerified:
       state.emailVerified === 'true' ? true : state.emailVerified === 'false' ? false : undefined,
-    createdFrom: dayStart(state.createdFrom),
-    createdTo: dayEnd(state.createdTo),
+    createdFrom: calendarDateStart(state.createdFrom),
+    createdTo: calendarDateEnd(state.createdTo),
   };
 }

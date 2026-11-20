@@ -11,7 +11,7 @@ import { FilterSelect } from '@/components/data-table/filter-select';
 import { TableRefreshButton } from '@/components/data-table/table-refresh-button';
 import { TableToolbar } from '@/components/data-table/table-toolbar';
 import { toAuditListQuery } from '@/components/audit-log/list-query';
-import { auditSearchParams } from '@/components/users/search-params';
+import { auditSearchParams } from '@/components/audit-log/search-params';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';

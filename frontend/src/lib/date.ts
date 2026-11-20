@@ -30,6 +30,25 @@ export function parseCalendarDate(value: string | null | undefined): Date | unde
   return new Date(year, month - 1, day);
 }
 
+/** The first instant of a calendar date, for an inclusive "from" filter. */
+export function calendarDateStart(value: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return `${value}T00:00:00.000Z`;
+}
+
+/**
+ * The last instant of a calendar date.
+ * A date-only "to" value would stop at midnight and hide the rest of that day.
+ */
+export function calendarDateEnd(value: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return `${value}T23:59:59.999Z`;
+}
+
 /** Formats a local calendar date as YYYY-MM-DD for query params. */
 export function toLocalDateString(date: Date): string {
   const year = date.getFullYear();
